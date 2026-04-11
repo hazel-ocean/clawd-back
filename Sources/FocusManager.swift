@@ -1,9 +1,9 @@
 import AppKit
 
-func focusGhostty() {
-  let ghostty = NSWorkspace.shared.runningApplications
-    .first { $0.bundleIdentifier == "com.mitchellh.ghostty" }
-  ghostty?.activate(options: [.activateAllWindows, .activateIgnoringOtherApps])
+func focusTerminal(_ terminal: Terminal) {
+  let app = NSWorkspace.shared.runningApplications
+    .first { $0.bundleIdentifier == terminal.bundleIdentifier }
+  app?.activate(options: [.activateAllWindows, .activateIgnoringOtherApps])
 }
 
 func focusZellijTab(session: String, tabName: String, paneId: String?) {

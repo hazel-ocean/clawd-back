@@ -38,7 +38,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
     let tabName = userInfo["tabName"] as? String
     let paneId = userInfo["paneId"] as? String
 
-    focusGhostty()
+    let config = loadConfig()
+    let terminal = Terminal(rawValue: config.terminal) ?? .ghostty
+    focusTerminal(terminal)
 
     if let session = session, !session.isEmpty,
       let tabName = tabName, !tabName.isEmpty

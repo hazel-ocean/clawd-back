@@ -1,6 +1,6 @@
 # claude-zellij-whip
 
-Smart macOS notifications for [Claude Code](https://docs.anthropic.com/en/docs/claude-code) running in [Ghostty](https://ghostty.org/) + [Zellij](https://zellij.dev/). When you click a notification, it focuses Ghostty, navigates to the correct Zellij tab, and focuses the exact pane where Claude Code is waiting.
+Smart macOS notifications for [Claude Code](https://docs.anthropic.com/en/docs/claude-code) running in [Ghostty](https://ghostty.org/) or [WezTerm](https://wezfurlong.org/wezterm/) + [Zellij](https://zellij.dev/). When you click a notification, it focuses your terminal, navigates to the correct Zellij tab, and focuses the exact pane where Claude Code is waiting.
 
 ![screenshot](screenshot.png)
 
@@ -19,9 +19,43 @@ A headless macOS app that:
 ## Dependencies
 
 - **macOS** (uses `UNUserNotificationCenter`)
-- **[Ghostty](https://ghostty.org/)** terminal
+- **Terminal emulator** (one of):
+  - [Ghostty](https://ghostty.org/) (default)
+  - [WezTerm](https://wezfurlong.org/wezterm/)
+  - [iTerm2](https://iterm2.com/)
+  - [Terminal.app](https://support.apple.com/guide/terminal/welcome/mac) (built-in)
+  - [Alacritty](https://alacritty.org/)
+  - [kitty](https://sw.kovidgoyal.net/kitty/)
 - **[Zellij](https://zellij.dev/)** terminal multiplexer
 - **[room](https://github.com/rvcas/room)** - Zellij plugin that handles pane focusing via pipe
+
+## Configuration
+
+The app can be configured to use different terminal emulators via a config file.
+
+**Config file location:** `~/.config/claude-zellij-whip/config.toml` or `config.json`
+
+**Supported terminals:**
+- `ghostty` (default, used if config file doesn't exist)
+- `wezterm`
+- `iterm2`
+- `terminal` (macOS Terminal.app)
+- `alacritty`
+- `kitty`
+
+**TOML config (preferred):**
+```toml
+terminal = "wezterm"
+```
+
+**JSON config:**
+```json
+{
+  "terminal": "wezterm"
+}
+```
+
+**Default behavior:** If no config file exists, the app defaults to `ghostty`. TOML is checked first, then JSON.
 
 ## Installation
 
@@ -115,7 +149,7 @@ Shows macOS notification (with context in userInfo)
     ↓
 User clicks notification
     ↓
-App activates Ghostty
+App loads config and activates configured terminal (Ghostty or WezTerm)
     ↓
 App runs: zellij --session <session> action go-to-tab-name <tab>
     ↓
@@ -132,7 +166,8 @@ claude-zellij-whip/
 │   ├── main.swift              # Entry point, mode detection
 │   ├── AppDelegate.swift       # Notification click handling
 │   ├── NotificationSender.swift # Notification creation
-│   ├── FocusManager.swift      # Ghostty/Zellij focus logic
+│   ├── FocusManager.swift      # Terminal/Zellij focus logic
+│   ├── Config.swift            # Configuration loading
 │   └── ZellijContext.swift     # Tab name extraction
 ├── Resources/
 │   ├── Info.plist              # App bundle config (LSUIElement)
