@@ -10,7 +10,6 @@ func sendNotification(args: [String]) async {
 
   let session = ProcessInfo.processInfo.environment["ZELLIJ_SESSION_NAME"]
   let paneId = ProcessInfo.processInfo.environment["ZELLIJ_PANE_ID"]
-  let tabName = getCurrentTabName(session: session)
 
   let center = UNUserNotificationCenter.current()
   let settings = await center.notificationSettings()
@@ -33,9 +32,10 @@ func sendNotification(args: [String]) async {
   content.title = title
   content.body = message
   content.sound = .default
+  // Break through Focus modes (needs the time-sensitive entitlement + signing).
+  content.interruptionLevel = .timeSensitive
   content.userInfo = [
     "session": session ?? "",
-    "tabName": tabName ?? "",
     "paneId": paneId ?? "",
   ]
 

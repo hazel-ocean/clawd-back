@@ -2,6 +2,8 @@ import AppKit
 import UserNotifications
 
 class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
+  private var handled = false
+
   func applicationDidFinishLaunching(_ notification: Notification) {
     UNUserNotificationCenter.current().delegate = self
 
@@ -27,7 +29,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
     [.banner, .sound]
   }
 
+  // A cold launch from a click can arrive via both the launch userInfo and the
+  // didReceive delegate; act only once.
   private func handleNotificationResponse(_ response: UNNotificationResponse) {
+    guard !handled else { return }
+    handled = true
+
     guard response.actionIdentifier == UNNotificationDefaultActionIdentifier else {
       terminateApp()
       return
@@ -35,7 +42,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
 
     let userInfo = response.notification.request.content.userInfo
     let session = userInfo["session"] as? String
-    let tabName = userInfo["tabName"] as? String
     let paneId = userInfo["paneId"] as? String
 
     let config = loadConfig()
@@ -43,9 +49,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
     focusTerminal(terminal)
 
     if let session = session, !session.isEmpty,
-      let tabName = tabName, !tabName.isEmpty
+      let paneId = paneId, !paneId.isEmpty
     {
-      focusZellijTab(session: session, tabName: tabName, paneId: paneId)
+      focusZellijPane(session: session, paneId: paneId)
     }
 
     terminateApp()

@@ -26,8 +26,7 @@ A headless macOS app that:
   - [Terminal.app](https://support.apple.com/guide/terminal/welcome/mac) (built-in)
   - [Alacritty](https://alacritty.org/)
   - [kitty](https://sw.kovidgoyal.net/kitty/)
-- **[Zellij](https://zellij.dev/)** terminal multiplexer
-- **[room](https://github.com/rvcas/room)** - Zellij plugin that handles pane focusing via pipe
+- **[Zellij](https://zellij.dev/)** terminal multiplexer (with the built-in `action focus-pane-id`, i.e. a reasonably recent version)
 
 ## Configuration
 
@@ -59,22 +58,7 @@ terminal = "wezterm"
 
 ## Installation
 
-### 1. Install the room plugin
-
-```bash
-# Clone and build
-git clone https://github.com/rvcas/room
-cd room
-cargo build --release
-
-# Copy to Zellij plugins
-mkdir -p ~/.config/zellij/plugins
-cp target/wasm32-wasip1/release/room.wasm ~/.config/zellij/plugins/
-```
-
-Make sure room is loaded in your Zellij session (via layout or config).
-
-### 2. Build and install ClaudeZellijWhip
+### Build and install ClaudeZellijWhip
 
 ```bash
 git clone https://github.com/rvcas/claude-zellij-whip
@@ -143,7 +127,7 @@ Claude Code Hook
     ↓
 open ClaudeZellijWhip.app --args notify --message "..."
     ↓
-App captures: $ZELLIJ_SESSION_NAME, $ZELLIJ_PANE_ID, current tab name
+App captures: $ZELLIJ_SESSION_NAME, $ZELLIJ_PANE_ID
     ↓
 Shows macOS notification (with context in userInfo)
     ↓
@@ -151,11 +135,9 @@ User clicks notification
     ↓
 App loads config and activates configured terminal (Ghostty or WezTerm)
     ↓
-App runs: zellij --session <session> action go-to-tab-name <tab>
+App runs: zellij --session <session> action focus-pane-id terminal_<pane_id>
     ↓
-App runs: zellij --session <session> pipe --plugin file:~/.config/zellij/plugins/room.wasm --name focus-pane -- <pane_id>
-    ↓
-room plugin calls focus_terminal_pane(pane_id)
+Zellij switches to the pane's tab and focuses the pane
 ```
 
 ## Project Structure
@@ -168,7 +150,7 @@ claude-zellij-whip/
 │   ├── NotificationSender.swift # Notification creation
 │   ├── FocusManager.swift      # Terminal/Zellij focus logic
 │   ├── Config.swift            # Configuration loading
-│   └── ZellijContext.swift     # Tab name extraction
+│   └── ZellijContext.swift     # Zellij binary discovery
 ├── Resources/
 │   ├── Info.plist              # App bundle config (LSUIElement)
 │   └── AppIcon.icns            # App icon (shows in notifications)
