@@ -1,0 +1,38 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: build (aarch64-darwin)
+    # macos-14 and later runners are Apple Silicon (arm64/aarch64).
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show toolchain
+        run: |
+          swift --version
+          uname -m
+
+      - name: Build release
+        run: make release
+
+      - name: Bundle app
+        run: make bundle
+
+      - name: Verify architecture
+        run: |
+          bin=.build/release/claude-zellij-whip
+          file "$bin"
+          lipo -archs "$bin" | tr ' ' '\n' | grep -qx arm64
+
+      - name: Upload app bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: ClaudeZellijWhip-aarch64-darwin
+          path: ClaudeZellijWhip.app
