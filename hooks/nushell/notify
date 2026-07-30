@@ -21,15 +21,15 @@ let last_said = (
   } else { "" }
 )
 
-# Title states what happened; body carries what Claude actually said (the
-# Notification message, or the Stop transcript tail), nudging you over when
-# there's no text to show.
+# Title states the reason: on a Notification it's the specific message (which
+# tool needs permission, or idle) from the hook payload; on Stop it's the
+# finished state. Body always carries Claude's last transcript text as color,
+# nudging you over when there's none to show.
 let title = (match $event {
-  "Notification" => "Claude needs your input"
+  "Notification" => (if ($message | str trim | is-empty) { "Claude needs your input" } else { $message })
   "Stop" | _     => "Claude has finished and is waiting"
 })
-let said = (if $event == "Notification" { $message } else { $last_said })
-let body = (if ($said | str trim | is-empty) { "Click to go check on Clawd." } else { $said })
+let body = (if ($last_said | str trim | is-empty) { "Click to go check on Clawd." } else { $last_said })
 
 if ($app | path exists) {
   ^open $app --args notify --title $title --message $body --session-id $session_id
