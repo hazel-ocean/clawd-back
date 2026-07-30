@@ -55,19 +55,21 @@ The app has three modes, each driven by a Claude Code hook:
 
 `capture` runs on **both** `SessionStart` (initial/attach) and `UserPromptSubmit` (every turn). The per-turn re-capture keeps targeting correct after you reattach a Zellij session in a *different* terminal window: the process never restarts so `SessionStart` never re-fires, but the next prompt refreshes the saved window/tab. It only writes when the terminal is frontmost, which both events guarantee.
 
-Claude Code delivers the hook payload (including `session_id`) as **JSON on stdin**, so each mode is fronted by a tiny wrapper that reads stdin and calls the app. **Ready-made wrappers ship inside the app bundle** at `~/Applications/ClawdBack.app/Contents/Resources/hooks/{capture,notify,cleanup}`, so point your hooks straight at them, no copy-paste:
+Claude Code delivers the hook payload (including `session_id`) as **JSON on stdin**, so each mode is fronted by a tiny wrapper that reads stdin and calls the app. **Ready-made wrappers ship inside the app bundle** at `/Applications/ClawdBack.app/Contents/Resources/hooks/{capture,notify,cleanup}`, so point your hooks straight at them, no copy-paste:
 
 ```json
 {
   "hooks": {
-    "SessionStart":     [{ "hooks": [{ "type": "command", "command": "~/Applications/ClawdBack.app/Contents/Resources/hooks/capture" }] }],
-    "UserPromptSubmit": [{ "hooks": [{ "type": "command", "command": "~/Applications/ClawdBack.app/Contents/Resources/hooks/capture" }] }],
-    "Stop":             [{ "hooks": [{ "type": "command", "command": "~/Applications/ClawdBack.app/Contents/Resources/hooks/notify" }] }],
-    "Notification":     [{ "hooks": [{ "type": "command", "command": "~/Applications/ClawdBack.app/Contents/Resources/hooks/notify" }] }],
-    "SessionEnd":       [{ "hooks": [{ "type": "command", "command": "~/Applications/ClawdBack.app/Contents/Resources/hooks/cleanup" }] }]
+    "SessionStart":     [{ "hooks": [{ "type": "command", "command": "/Applications/ClawdBack.app/Contents/Resources/hooks/capture" }] }],
+    "UserPromptSubmit": [{ "hooks": [{ "type": "command", "command": "/Applications/ClawdBack.app/Contents/Resources/hooks/capture" }] }],
+    "Stop":             [{ "hooks": [{ "type": "command", "command": "/Applications/ClawdBack.app/Contents/Resources/hooks/notify" }] }],
+    "Notification":     [{ "hooks": [{ "type": "command", "command": "/Applications/ClawdBack.app/Contents/Resources/hooks/notify" }] }],
+    "SessionEnd":       [{ "hooks": [{ "type": "command", "command": "/Applications/ClawdBack.app/Contents/Resources/hooks/cleanup" }] }]
   }
 }
 ```
+
+Use whatever path the app actually lives at, `~/Applications/...` if you installed there via `make install`.
 
 Prefer your own copies (or a different shell)? The wrappers live under [`hooks/`](hooks/), one directory per shell: [`hooks/bash/`](hooks/bash/) (the set bundled into the app) and [`hooks/nushell/`](hooks/nushell/). Copy a set to `~/.claude/hooks/` and point the commands there instead.
 
