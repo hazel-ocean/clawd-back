@@ -70,6 +70,11 @@ struct TerminalController {
     // Wait out this app's ~0.1s self-terminate so the focus lands after we've
     // quit and the terminal has settled (otherwise our quit resets the tab).
     var steps = ["sleep 0.3"]
+    // Bring the terminal app to the front first. `activate window` alone only
+    // raises a window within the app; when another app (e.g. Safari) was
+    // frontmost, macOS restores IT after we quit unless we do a real app
+    // activation. `open -b` does that cross-app; the window/tab select follows.
+    steps.append("/usr/bin/open -b \(shq(terminal.bundleIdentifier))")
     if terminal == .ghostty, hasWindow, let windowId = windowId, let tabId = tabId {
       let script = [
         "tell application \"Ghostty\"",
@@ -81,9 +86,6 @@ struct TerminalController {
       try? script.write(toFile: tmp, atomically: true, encoding: .utf8)
       steps.append("/usr/bin/osascript \(shq(tmp))")
       steps.append("rm -f \(shq(tmp))")
-    } else if hasWindow || hasPane {
-      // Non-Ghostty, or zellij with no captured window: just raise the app.
-      steps.append("/usr/bin/open -b \(shq(terminal.bundleIdentifier))")
     }
     if hasPane, let session = zellijSession, let pane = zellijPane, let zellij = findZellijPath() {
       steps.append(
