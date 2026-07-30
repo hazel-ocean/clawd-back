@@ -15,6 +15,6 @@ case "$event" in
   Notification) title=${message:-"Claude needs your input"} ;;
   *)            title="Claude has finished and is waiting..." ;;
 esac
-body=${message:-"Claude needs you"}
+body=${message:-"Clawd says it's ready for you."}
 
 open "$app" --args notify --title "$title" --message "$body" --session-id "$sid"

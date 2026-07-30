@@ -11,7 +11,7 @@ let title = (match $event {
   "Notification" => (if ($message | is-empty) { "Claude needs your input" } else { $message })
   "Stop" | _ => "Claude has finished and is waiting..."
 })
-let body = (if ($message | is-empty) { "Claude needs you" } else { $message })
+let body = (if ($message | is-empty) { "Clawd says it's ready for you." } else { $message })
 
 if ($app | path exists) {
   ^open $app --args notify --title $title --message $body --session-id $session_id
