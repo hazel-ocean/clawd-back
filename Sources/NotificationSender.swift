@@ -75,7 +75,7 @@ func sendNotification(args: [String]) async {
     }
   } else if settings.authorizationStatus == .denied {
     print(
-      "Notifications are denied. Please enable in System Settings > Notifications > ClaudeZellijWhip"
+      "Notifications are denied. Please enable in System Settings > Notifications > ClawdBack"
     )
     return
   }

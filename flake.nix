@@ -17,7 +17,7 @@
       in
       {
         packages.default = app;
-        packages.claude-zellij-whip = app;
+        packages.clawd-back = app;
       }
     );
 }

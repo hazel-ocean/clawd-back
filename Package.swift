@@ -4,14 +4,14 @@
 import PackageDescription
 
 let package = Package(
-  name: "claude-zellij-whip",
+  name: "clawd-back",
   platforms: [.macOS(.v13)],
   dependencies: [
     .package(url: "https://github.com/dduan/TOMLDecoder.git", from: "0.2.0")
   ],
   targets: [
     .executableTarget(
-      name: "claude-zellij-whip",
+      name: "clawd-back",
       dependencies: ["TOMLDecoder"]
     )
   ]

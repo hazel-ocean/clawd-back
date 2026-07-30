@@ -1,9 +1,9 @@
 .PHONY: build release clean install uninstall sign
 
-APP_NAME = ClaudeZellijWhip
+APP_NAME = ClawdBack
 BUNDLE_NAME = $(APP_NAME).app
 INSTALL_DIR = $(HOME)/Applications
-EXECUTABLE_NAME = claude-zellij-whip
+EXECUTABLE_NAME = clawd-back
 
 # Code signing identity: use "-" for ad-hoc, or your Developer ID
 # Set SIGNING_IDENTITY env var or pass to make: make install SIGNING_IDENTITY="Your Identity"
@@ -55,7 +55,7 @@ uninstall:
 
 test-notify: install
 	@echo "Sending test notification..."
-	open $(INSTALL_DIR)/$(BUNDLE_NAME) --args notify --message "Test notification from Claude Zellij Whip" --title "Test"
+	open $(INSTALL_DIR)/$(BUNDLE_NAME) --args notify --message "Test notification from Clawd Back" --title "Test"
 
 # List available signing identities
 list-identities:

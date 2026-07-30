@@ -13,5 +13,5 @@ version="${1:?usage: build-release.sh <version>}"
 make bundle
 
 mkdir -p dist
-ditto -c -k --keepParent ClaudeZellijWhip.app \
-  "dist/ClaudeZellijWhip-${version}-aarch64-darwin.zip"
+ditto -c -k --keepParent ClawdBack.app \
+  "dist/ClawdBack-${version}-aarch64-darwin.zip"

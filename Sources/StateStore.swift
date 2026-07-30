@@ -18,13 +18,13 @@ struct WhipState: Codable {
   }
 }
 
-// Per-session state under ~/.cache/claude-zellij-whip/<session-id>.json.
+// Per-session state under ~/.cache/clawd-back/<session-id>.json.
 enum StateStore {
   private static func fileURL(_ sessionId: String) -> URL? {
     let safe = sessionId.filter { $0.isLetter || $0.isNumber || $0 == "-" || $0 == "_" }
     guard !safe.isEmpty else { return nil }
     let dir = FileManager.default.homeDirectoryForCurrentUser
-      .appendingPathComponent(".cache/claude-zellij-whip", isDirectory: true)
+      .appendingPathComponent(".cache/clawd-back", isDirectory: true)
     try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
     return dir.appendingPathComponent("\(safe).json")
   }

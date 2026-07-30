@@ -3,13 +3,13 @@
 <plist version="1.0">
 <dict>
     <key>CFBundleIdentifier</key>
-    <string>dev.rvcas.claude-zellij-whip</string>
+    <string>com.hazel.clawd-back</string>
     <key>CFBundleName</key>
-    <string>ClaudeZellijWhip</string>
+    <string>ClawdBack</string>
     <key>CFBundleDisplayName</key>
-    <string>Claude Zellij Whip</string>
+    <string>Clawd Back</string>
     <key>CFBundleExecutable</key>
-    <string>claude-zellij-whip</string>
+    <string>clawd-back</string>
     <key>CFBundleVersion</key>
     <string>1.0.0</string>
     <key>CFBundleShortVersionString</key>

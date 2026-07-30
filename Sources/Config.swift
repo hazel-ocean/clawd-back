@@ -27,7 +27,7 @@ enum Terminal: String, CaseIterable {
 
 func loadConfig() -> AppConfig {
   let configDir = FileManager.default.homeDirectoryForCurrentUser
-    .appendingPathComponent(".config/claude-zellij-whip", isDirectory: true)
+    .appendingPathComponent(".config/clawd-back", isDirectory: true)
 
   let tomlPath = configDir.appendingPathComponent("config.toml")
   let jsonPath = configDir.appendingPathComponent("config.json")

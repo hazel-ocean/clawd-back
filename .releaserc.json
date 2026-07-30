@@ -14,8 +14,8 @@
       {
         "assets": [
           {
-            "path": "dist/ClaudeZellijWhip-*-aarch64-darwin.zip",
-            "label": "ClaudeZellijWhip (aarch64-darwin)"
+            "path": "dist/ClawdBack-*-aarch64-darwin.zip",
+            "label": "ClawdBack (aarch64-darwin)"
           }
         ]
       }

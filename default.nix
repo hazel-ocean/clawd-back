@@ -14,7 +14,7 @@ let
   generated = swiftpm2nix.helpers ./nix;
 in
 stdenv.mkDerivation {
-  pname = "claude-zellij-whip";
+  pname = "clawd-back";
   version = "1.0.0";
 
   src = lib.cleanSourceWith {
@@ -52,9 +52,9 @@ stdenv.mkDerivation {
 
   installPhase = ''
     runHook preInstall
-    app="$out/Applications/ClaudeZellijWhip.app"
+    app="$out/Applications/ClawdBack.app"
     mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
-    cp .build/release/claude-zellij-whip "$app/Contents/MacOS/"
+    cp .build/release/clawd-back "$app/Contents/MacOS/"
     cp Resources/Info.plist "$app/Contents/"
     cp Resources/AppIcon.icns "$app/Contents/Resources/"
     cp -R Resources/Crabs "$app/Contents/Resources/"
@@ -64,6 +64,6 @@ stdenv.mkDerivation {
   meta = {
     description = "macOS notifier that returns you to the Zellij pane Claude Code runs in";
     platforms = lib.platforms.darwin;
-    mainProgram = "claude-zellij-whip";
+    mainProgram = "clawd-back";
   };
 }

@@ -1,4 +1,4 @@
-# claude-zellij-whip
+# clawd-back
 
 Smart macOS notifications for [Claude Code](https://docs.anthropic.com/en/docs/claude-code) running in [Ghostty](https://ghostty.org/) or [WezTerm](https://wezfurlong.org/wezterm/) + [Zellij](https://zellij.dev/). When you click a notification, it focuses your terminal, navigates to the correct Zellij tab, and focuses the exact pane where Claude Code is waiting.
 
@@ -32,7 +32,7 @@ A headless macOS app that:
 
 The app can be configured to use different terminal emulators via a config file.
 
-**Config file location:** `~/.config/claude-zellij-whip/config.toml` or `config.json`
+**Config file location:** `~/.config/clawd-back/config.toml` or `config.json`
 
 **Supported terminals:**
 - `ghostty` (default, used if config file doesn't exist)
@@ -58,15 +58,15 @@ terminal = "wezterm"
 
 ## Installation
 
-### Build and install ClaudeZellijWhip
+### Build and install ClawdBack
 
 ```bash
-git clone https://github.com/rvcas/claude-zellij-whip
-cd claude-zellij-whip
+git clone https://github.com/hazel-ocean/clawd-back
+cd clawd-back
 make install
 ```
 
-The app will be installed to `~/Applications/ClaudeZellijWhip.app`.
+The app will be installed to `~/Applications/ClawdBack.app`.
 
 #### Code Signing (Optional)
 
@@ -85,7 +85,7 @@ make install SIGNING_IDENTITY="Apple Development: Your Name (XXXXXXXXXX)"
 ### Manual test
 
 ```bash
-open ~/Applications/ClaudeZellijWhip.app --args notify \
+open ~/Applications/ClawdBack.app --args notify \
   --title "Claude Code" \
   --message "Test notification" \
   --folder "my-project"
@@ -103,14 +103,14 @@ Add to `~/.claude/settings.json` (see [hooks documentation](https://docs.anthrop
         "matcher": "idle_prompt",
         "hooks": [{
           "type": "command",
-          "command": "open ~/Applications/ClaudeZellijWhip.app --args notify --title 'Claude Code' --message 'Waiting for your input' --folder ${CLAUDE_PROJECT_DIR##*/}"
+          "command": "open ~/Applications/ClawdBack.app --args notify --title 'Claude Code' --message 'Waiting for your input' --folder ${CLAUDE_PROJECT_DIR##*/}"
         }]
       },
       {
         "matcher": "permission_prompt",
         "hooks": [{
           "type": "command",
-          "command": "open ~/Applications/ClaudeZellijWhip.app --args notify --title 'Claude Code' --message 'Permission needed' --folder ${CLAUDE_PROJECT_DIR##*/}"
+          "command": "open ~/Applications/ClawdBack.app --args notify --title 'Claude Code' --message 'Permission needed' --folder ${CLAUDE_PROJECT_DIR##*/}"
         }]
       }
     ]
@@ -125,14 +125,14 @@ The `--folder` parameter appends the project folder name to the notification tit
 ```
 SessionStart hook (startup/resume) — Claude's window is reliably frontmost
     ↓
-open ClaudeZellijWhip.app --args capture --session-id <id>
+open ClawdBack.app --args capture --session-id <id>
     ↓
 App records window_id + tab_id (+ zellij_session_id/zellij_pane_id in zellij)
-to ~/.cache/claude-zellij-whip/<session-id>.json
+to ~/.cache/clawd-back/<session-id>.json
     ⋮  (later)
 Stop / Notification hook
     ↓
-open ClaudeZellijWhip.app --args notify --session-id <id> --message "..."
+open ClawdBack.app --args notify --session-id <id> --message "..."
     ↓
 App loads the saved state. If you're already looking at Claude's window
 (front window == saved window_id, + in zellij its pane), it SKIPS. Otherwise:
@@ -152,7 +152,7 @@ app (+ `focus-pane-id` in zellij).
 ## Project Structure
 
 ```
-claude-zellij-whip/
+clawd-back/
 ├── Sources/
 │   ├── main.swift              # Entry point, mode detection
 │   ├── AppDelegate.swift       # Notification click handling

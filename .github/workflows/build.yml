@@ -27,12 +27,12 @@ jobs:
 
       - name: Verify architecture
         run: |
-          bin=.build/release/claude-zellij-whip
+          bin=.build/release/clawd-back
           file "$bin"
           lipo -archs "$bin" | tr ' ' '\n' | grep -qx arm64
 
       - name: Upload app bundle
         uses: actions/upload-artifact@v4
         with:
-          name: ClaudeZellijWhip-aarch64-darwin
-          path: ClaudeZellijWhip.app
+          name: ClawdBack-aarch64-darwin
+          path: ClawdBack.app
