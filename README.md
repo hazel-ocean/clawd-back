@@ -9,9 +9,10 @@ It also stays quiet when you are already looking at that session, so you only ge
 ## What it does
 
 - **Notifies** via `UNUserNotificationCenter` on Claude's `Stop` and `Notification` hooks.
-- **Remembers where the session lives.** On `SessionStart` (when the terminal is reliably frontmost) it records the OS window id + tab id, plus the Zellij session/pane when present, keyed by Claude session id.
+- **Remembers where the session lives.** On `SessionStart` and every `UserPromptSubmit` (when the terminal is reliably frontmost) it records the OS window id + tab id, plus the Zellij session/pane when present, keyed by Claude session id. Re-capturing per prompt keeps targeting correct after you reattach a Zellij session in a different window.
 - **Skips the banner** when the front window is already that session's window (and, in Zellij, its pane).
 - **Clicks back.** Clicking a notification raises the saved window, selects its tab, brings the app to the front (even from another app), and in Zellij runs `action focus-pane-id`.
+- **Cleans up** the saved state on `SessionEnd`.
 - **Crabs.** Each notification shows a random Claude Crab as its image.
 
 ## Requirements
