@@ -4,8 +4,13 @@ let app = NSApplication.shared
 let args = CommandLine.arguments
 
 if args.count > 1 && args[1] == "capture" {
-  // SessionStart: record Claude's window+tab (when it's reliably frontmost).
+  // SessionStart / UserPromptSubmit: record Claude's window+tab (when it's reliably frontmost).
   captureAndSave(args: Array(args.dropFirst(2)))
+} else if args.count > 1 && args[1] == "cleanup" {
+  // SessionEnd: drop this session's saved window/tab state.
+  if let sid = parseArg(Array(args.dropFirst(2)), flag: "--session-id"), !sid.isEmpty {
+    StateStore.clear(sid)
+  }
 } else if args.count > 1 && args[1] == "notify" {
   Task {
     await sendNotification(args: Array(args.dropFirst(2)))
