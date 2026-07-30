@@ -1,183 +1,123 @@
-# clawd-back
+# Clawd Back
 
-Smart macOS notifications for [Claude Code](https://docs.anthropic.com/en/docs/claude-code) running in [Ghostty](https://ghostty.org/) or [WezTerm](https://wezfurlong.org/wezterm/) + [Zellij](https://zellij.dev/). When you click a notification, it focuses your terminal, navigates to the correct Zellij tab, and focuses the exact pane where Claude Code is waiting.
+A tiny macOS app that notifies you when [Claude Code](https://docs.anthropic.com/en/docs/claude-code) needs you, and **claws you back** to the exact terminal window, tab, and (in [Zellij](https://zellij.dev/)) pane where that session is waiting when you click the notification.
 
-![screenshot](screenshot.png)
+It also stays quiet when you are already looking at that session, so you only get pinged when it is actually worth switching.
 
-## The Problem
+> Fork of [rvcas/claude-zellij-whip](https://github.com/rvcas/claude-zellij-whip) (MIT). The original focused on Zellij pane focus; this fork adds OS window/tab targeting, skip-when-viewing, a Nix flake, and some crabs.
 
-Claude Code's default `\a` bell notifications don't work properly through Zellij. Even with workarounds like `terminal-notifier`, clicking notifications doesn't bring you back to the right place.
+## What it does
 
-## The Solution
+- **Notifies** via `UNUserNotificationCenter` on Claude's `Stop` and `Notification` hooks.
+- **Remembers where the session lives.** On `SessionStart` (when the terminal is reliably frontmost) it records the OS window id + tab id, plus the Zellij session/pane when present, keyed by Claude session id.
+- **Skips the banner** when the front window is already that session's window (and, in Zellij, its pane).
+- **Clicks back.** Clicking a notification raises the saved window, selects its tab, brings the app to the front (even from another app), and in Zellij runs `action focus-pane-id`.
+- **Crabs.** Each notification shows a random Claude Crab as its image.
 
-A headless macOS app that:
+## Requirements
 
-1. Sends notifications via `UNUserNotificationCenter`
-2. Captures Zellij context (session, tab, pane) when sending
-3. On click: focuses Ghostty → navigates to tab → focuses pane
+- macOS (uses `UNUserNotificationCenter` + AppKit).
+- A terminal emulator. **Ghostty** is fully supported (window + tab targeting via AppleScript). Others (`wezterm`, `iterm2`, `terminal`, `alacritty`, `kitty`) degrade to activating the app, plus Zellij pane focus.
+- Optional: [Zellij](https://zellij.dev/) with the built-in `action focus-pane-id`.
 
-## Dependencies
+## Install
 
-- **macOS** (uses `UNUserNotificationCenter`)
-- **Terminal emulator** (one of):
-  - [Ghostty](https://ghostty.org/) (default)
-  - [WezTerm](https://wezfurlong.org/wezterm/)
-  - [iTerm2](https://iterm2.com/)
-  - [Terminal.app](https://support.apple.com/guide/terminal/welcome/mac) (built-in)
-  - [Alacritty](https://alacritty.org/)
-  - [kitty](https://sw.kovidgoyal.net/kitty/)
-- **[Zellij](https://zellij.dev/)** terminal multiplexer (with the built-in `action focus-pane-id`, i.e. a reasonably recent version)
+### Nix (flake)
 
-## Configuration
-
-The app can be configured to use different terminal emulators via a config file.
-
-**Config file location:** `~/.config/clawd-back/config.toml` or `config.json`
-
-**Supported terminals:**
-- `ghostty` (default, used if config file doesn't exist)
-- `wezterm`
-- `iterm2`
-- `terminal` (macOS Terminal.app)
-- `alacritty`
-- `kitty`
-
-**TOML config (preferred):**
-```toml
-terminal = "wezterm"
+```nix
+inputs.clawd-back.url = "github:hazel-ocean/clawd-back";
 ```
 
-**JSON config:**
-```json
-{
-  "terminal": "wezterm"
-}
-```
+The flake exposes `packages.default` (an `.app` under `$out/Applications`). Install it where LaunchServices can find it, for example a home-manager activation that copies it to `~/Applications`, re-signs ad-hoc, and runs `lsregister`.
 
-**Default behavior:** If no config file exists, the app defaults to `ghostty`. TOML is checked first, then JSON.
-
-## Installation
-
-### Build and install ClawdBack
+### Make
 
 ```bash
 git clone https://github.com/hazel-ocean/clawd-back
 cd clawd-back
-make install
+make install   # builds, bundles, signs, installs to ~/Applications/ClawdBack.app
 ```
 
-The app will be installed to `~/Applications/ClawdBack.app`.
+By default the app is ad-hoc signed. To use a Developer ID: `make install SIGNING_IDENTITY="Apple Development: You (XXXXXXXXXX)"`.
 
-#### Code Signing (Optional)
+> First time you click a notification, macOS asks for permission to control Ghostty (Automation). Grant it. An ad-hoc re-sign on rebuild can reset that grant; the app still comes to the front regardless, only the tab-select needs it.
 
-By default, the app is ad-hoc signed. To sign with your Apple Developer ID:
+## Claude Code hooks
+
+The app has two modes:
+
+- `capture --session-id <id>` on `SessionStart` (for sources `startup`, `resume`, `clear`, `fork`).
+- `notify --session-id <id> --title <t> --message <m>` on `Stop` and `Notification`.
+
+Claude Code delivers the hook payload (including `session_id`) as **JSON on stdin**, so wrap the app in a small script that reads stdin and calls it. A `notify` wrapper:
 
 ```bash
-# Find your identity
-security find-identity -v -p codesigning
-
-# Set it in the Makefile or pass it directly
-make install SIGNING_IDENTITY="Apple Development: Your Name (XXXXXXXXXX)"
+#!/usr/bin/env bash
+read -r payload
+sid=$(printf '%s' "$payload" | /usr/bin/plutil -extract session_id raw -o - -)
+open ~/Applications/ClawdBack.app --args notify --title "Claude" --message "Needs you" --session-id "$sid"
 ```
 
-## Usage
-
-### Manual test
-
-```bash
-open ~/Applications/ClawdBack.app --args notify \
-  --title "Claude Code" \
-  --message "Test notification" \
-  --folder "my-project"
-```
-
-### Claude Code hooks
-
-Add to `~/.claude/settings.json` (see [hooks documentation](https://docs.anthropic.com/en/docs/claude-code/hooks)):
+The `capture` wrapper is the same shape but calls `--args capture --session-id "$sid"` (and can gate on the payload's `source`). Point the hooks at these scripts in `~/.claude/settings.json`:
 
 ```json
 {
   "hooks": {
-    "Notification": [
-      {
-        "matcher": "idle_prompt",
-        "hooks": [{
-          "type": "command",
-          "command": "open ~/Applications/ClawdBack.app --args notify --title 'Claude Code' --message 'Waiting for your input' --folder ${CLAUDE_PROJECT_DIR##*/}"
-        }]
-      },
-      {
-        "matcher": "permission_prompt",
-        "hooks": [{
-          "type": "command",
-          "command": "open ~/Applications/ClawdBack.app --args notify --title 'Claude Code' --message 'Permission needed' --folder ${CLAUDE_PROJECT_DIR##*/}"
-        }]
-      }
-    ]
+    "SessionStart": [{ "hooks": [{ "type": "command", "command": "~/.claude/hooks/capture" }] }],
+    "Stop":         [{ "hooks": [{ "type": "command", "command": "~/.claude/hooks/notify" }] }],
+    "Notification": [{ "hooks": [{ "type": "command", "command": "~/.claude/hooks/notify" }] }]
   }
 }
 ```
 
-The `--folder` parameter appends the project folder name to the notification title (e.g., "Claude Code [my-project]"), using the `CLAUDE_PROJECT_DIR` environment variable provided by Claude Code.
+Because `open` propagates the caller's environment, `ZELLIJ_SESSION_NAME` / `ZELLIJ_PANE_ID` reach the app when the hook runs inside a Zellij pane.
 
-## How It Works
+## Configuration
 
-```
-SessionStart hook (startup/resume) — Claude's window is reliably frontmost
-    ↓
-open ClawdBack.app --args capture --session-id <id>
-    ↓
-App records window_id + tab_id (+ zellij_session_id/zellij_pane_id in zellij)
-to ~/.cache/clawd-back/<session-id>.json
-    ⋮  (later)
-Stop / Notification hook
-    ↓
-open ClawdBack.app --args notify --session-id <id> --message "..."
-    ↓
-App loads the saved state. If you're already looking at Claude's window
-(front window == saved window_id, + in zellij its pane), it SKIPS. Otherwise:
-    ↓
-Shows macOS notification (saved locator in userInfo)
-    ↓
-User clicks → app raises the saved window_id, selects tab_id,
-              and in zellij runs `action focus-pane-id terminal_<pane>`
+Pick a terminal in `~/.config/clawd-back/config.toml` (or `config.json`):
+
+```toml
+terminal = "ghostty"  # ghostty | wezterm | iterm2 | terminal | alacritty | kitty
 ```
 
-Targeting is by the **saved OS window id** captured at SessionStart (when
-Claude's window is reliably frontmost), so it's exact regardless of what's
-frontmost when a notification fires — no cwd guessing. Currently only **Ghostty**
-implements window/tab capture+focus; other terminals fall back to activating the
-app (+ `focus-pane-id` in zellij).
+Defaults to `ghostty` if no config exists.
 
-## Project Structure
+## How it works
 
 ```
-clawd-back/
-├── Sources/
-│   ├── main.swift              # Entry point, mode detection
-│   ├── AppDelegate.swift       # Notification click handling
-│   ├── NotificationSender.swift # Notification creation + tab-locator capture
-│   ├── TerminalController.swift # Per-terminal window+tab capture/focus
-│   ├── FocusManager.swift      # Zellij focus-pane-id
-│   ├── Config.swift            # Terminal-selection config loading
-│   └── ZellijContext.swift     # Zellij binary discovery
-├── Resources/
-│   ├── Info.plist              # App bundle config (LSUIElement)
-│   ├── AppIcon.icns            # App icon (the small notification badge)
-│   └── Crabs/                  # Claude Crab variations; one at random per notification
-├── Package.swift
-└── Makefile
+SessionStart  -->  open ClawdBack.app --args capture --session-id <id>
+                   saves window_id + tab_id (+ zellij session/pane)
+                   to ~/.cache/clawd-back/<id>.json
+
+Stop / Notify -->  open ClawdBack.app --args notify --session-id <id> ...
+                   already viewing that window? -> skip
+                   else show notification (locator in userInfo, random crab)
+
+click         -->  open -b <terminal>   (bring to front, cross-app)
+                   select saved window + tab
+                   zellij: action focus-pane-id terminal_<pane>
 ```
 
-## Makefile Targets
+Targeting is by the saved OS window id captured at `SessionStart`, so it is exact regardless of what is frontmost when a notification fires. Only Ghostty implements window/tab capture + select; other terminals fall back to activating the app (+ `focus-pane-id`).
 
-- `make build` - Debug build
-- `make release` - Release build
-- `make install` - Build, bundle, sign, and install to ~/Applications
-- `make uninstall` - Remove the app
-- `make clean` - Clean build artifacts
-- `make list-identities` - Show available code signing identities
+## Project layout
+
+```
+Sources/
+  main.swift               # mode dispatch: capture | notify | click handler
+  AppDelegate.swift        # notification click handling
+  NotificationSender.swift # capture + send, skip-when-viewing, crab attachment
+  TerminalController.swift # per-terminal window/tab capture + focus
+  StateStore.swift         # ~/.cache/clawd-back/<id>.json
+  Config.swift             # terminal-selection config (TOML/JSON)
+  ZellijContext.swift      # zellij binary discovery
+  FocusManager.swift       # zellij focus-pane-id
+Resources/
+  Info.plist               # LSUIElement bundle, id com.hazel.clawd-back
+  AppIcon.icns             # app icon
+  Crabs/                   # crab images, one at random per notification
+```
 
 ## License
 
-MIT
+MIT. See [LICENSE](LICENSE).
