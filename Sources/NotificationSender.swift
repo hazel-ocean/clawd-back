@@ -5,6 +5,22 @@ private func envNonEmpty(_ key: String) -> String? {
   ProcessInfo.processInfo.environment[key].flatMap { $0.isEmpty ? nil : $0 }
 }
 
+// A random crab icon from the bundled Resources/Crabs, copied to a fresh temp
+// URL so UNNotificationAttachment can take ownership without moving the
+// original out of the bundle. Returns nil if there are none (notification then
+// just falls back to the app icon).
+private func randomCrabAttachment() -> UNNotificationAttachment? {
+  guard let dir = Bundle.main.resourceURL?.appendingPathComponent("Crabs"),
+    let files = try? FileManager.default.contentsOfDirectory(
+      at: dir, includingPropertiesForKeys: nil),
+    let pick = files.filter({ $0.pathExtension.lowercased() == "png" }).randomElement()
+  else { return nil }
+  let tmp = URL(fileURLWithPath: NSTemporaryDirectory())
+    .appendingPathComponent("czw-crab-\(UUID().uuidString).png")
+  guard (try? FileManager.default.copyItem(at: pick, to: tmp)) != nil else { return nil }
+  return try? UNNotificationAttachment(identifier: "crab", url: tmp)
+}
+
 // SessionStart: record where Claude is running, keyed by the Claude session id,
 // so later notify/click resolve the exact window. Only runs when the terminal
 // is frontmost (which it is at startup/resume), so a background event can't
@@ -76,6 +92,9 @@ func sendNotification(args: [String]) async {
     "zellij_session_id": zellijSessionId ?? "",
     "zellij_pane_id": zellijPaneId ?? "",
   ]
+  if let crab = randomCrabAttachment() {
+    content.attachments = [crab]
+  }
 
   let request = UNNotificationRequest(
     identifier: UUID().uuidString,

@@ -57,6 +57,7 @@ stdenv.mkDerivation {
     cp .build/release/claude-zellij-whip "$app/Contents/MacOS/"
     cp Resources/Info.plist "$app/Contents/"
     cp Resources/AppIcon.icns "$app/Contents/Resources/"
+    cp -R Resources/Crabs "$app/Contents/Resources/"
     runHook postInstall
   '';
 

@@ -163,7 +163,8 @@ claude-zellij-whip/
 │   └── ZellijContext.swift     # Zellij binary discovery
 ├── Resources/
 │   ├── Info.plist              # App bundle config (LSUIElement)
-│   └── AppIcon.icns            # App icon (shows in notifications)
+│   ├── AppIcon.icns            # App icon (the small notification badge)
+│   └── Crabs/                  # Claude Crab variations; one at random per notification
 ├── Package.swift
 └── Makefile
 ```

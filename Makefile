@@ -28,6 +28,7 @@ bundle: release
 	@cp .build/release/$(EXECUTABLE_NAME) $(BUNDLE_NAME)/Contents/MacOS/
 	@cp Resources/Info.plist $(BUNDLE_NAME)/Contents/
 	@cp Resources/AppIcon.icns $(BUNDLE_NAME)/Contents/Resources/
+	@cp -R Resources/Crabs $(BUNDLE_NAME)/Contents/Resources/
 	@echo "App bundle created: $(BUNDLE_NAME)"
 
 sign: bundle
