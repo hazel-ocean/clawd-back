@@ -29,9 +29,8 @@ bundle: release
 	@cp Resources/Info.plist $(BUNDLE_NAME)/Contents/
 	@cp Resources/AppIcon.icns $(BUNDLE_NAME)/Contents/Resources/
 	@cp -R Resources/Crabs $(BUNDLE_NAME)/Contents/Resources/
-	@mkdir -p $(BUNDLE_NAME)/Contents/Resources/hooks
-	@cp hooks/bash/* $(BUNDLE_NAME)/Contents/Resources/hooks/
-	@chmod +x $(BUNDLE_NAME)/Contents/Resources/hooks/*
+	@cp -R hooks $(BUNDLE_NAME)/Contents/Resources/
+	@chmod +x $(BUNDLE_NAME)/Contents/Resources/hooks/*/*
 	@echo "App bundle created: $(BUNDLE_NAME)"
 
 sign: bundle

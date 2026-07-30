@@ -58,9 +58,8 @@ stdenv.mkDerivation {
     cp Resources/Info.plist "$app/Contents/"
     cp Resources/AppIcon.icns "$app/Contents/Resources/"
     cp -R Resources/Crabs "$app/Contents/Resources/"
-    mkdir -p "$app/Contents/Resources/hooks"
-    cp hooks/bash/* "$app/Contents/Resources/hooks/"
-    chmod +x "$app/Contents/Resources/hooks/"*
+    cp -R hooks "$app/Contents/Resources/"
+    chmod +x "$app/Contents/Resources/hooks/"*/*
     runHook postInstall
   '';
 

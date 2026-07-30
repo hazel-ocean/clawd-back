@@ -55,23 +55,41 @@ The app has three modes, each driven by a Claude Code hook:
 
 `capture` runs on **both** `SessionStart` (initial/attach) and `UserPromptSubmit` (every turn). The per-turn re-capture keeps targeting correct after you reattach a Zellij session in a *different* terminal window: the process never restarts so `SessionStart` never re-fires, but the next prompt refreshes the saved window/tab. It only writes when the terminal is frontmost, which both events guarantee.
 
-Claude Code delivers the hook payload (including `session_id`) as **JSON on stdin**, so each mode is fronted by a tiny wrapper that reads stdin and calls the app. **Ready-made wrappers ship inside the app bundle** at `/Applications/ClawdBack.app/Contents/Resources/hooks/{capture,notify,cleanup}`, so point your hooks straight at them, no copy-paste:
+Claude Code delivers the hook payload (including `session_id`) as **JSON on stdin**, so each mode is fronted by a tiny wrapper that reads stdin and calls the app. **Ready-made wrappers ship inside the app bundle**, one directory per shell, at `/Applications/ClawdBack.app/Contents/Resources/hooks/<shell>/{capture,notify,cleanup}`, so point your hooks straight at them, no copy-paste.
+
+Bash:
 
 ```json
 {
   "hooks": {
-    "SessionStart":     [{ "hooks": [{ "type": "command", "command": "/Applications/ClawdBack.app/Contents/Resources/hooks/capture" }] }],
-    "UserPromptSubmit": [{ "hooks": [{ "type": "command", "command": "/Applications/ClawdBack.app/Contents/Resources/hooks/capture" }] }],
-    "Stop":             [{ "hooks": [{ "type": "command", "command": "/Applications/ClawdBack.app/Contents/Resources/hooks/notify" }] }],
-    "Notification":     [{ "hooks": [{ "type": "command", "command": "/Applications/ClawdBack.app/Contents/Resources/hooks/notify" }] }],
-    "SessionEnd":       [{ "hooks": [{ "type": "command", "command": "/Applications/ClawdBack.app/Contents/Resources/hooks/cleanup" }] }]
+    "SessionStart":     [{ "hooks": [{ "type": "command", "command": "/Applications/ClawdBack.app/Contents/Resources/hooks/bash/capture" }] }],
+    "UserPromptSubmit": [{ "hooks": [{ "type": "command", "command": "/Applications/ClawdBack.app/Contents/Resources/hooks/bash/capture" }] }],
+    "Stop":             [{ "hooks": [{ "type": "command", "command": "/Applications/ClawdBack.app/Contents/Resources/hooks/bash/notify" }] }],
+    "Notification":     [{ "hooks": [{ "type": "command", "command": "/Applications/ClawdBack.app/Contents/Resources/hooks/bash/notify" }] }],
+    "SessionEnd":       [{ "hooks": [{ "type": "command", "command": "/Applications/ClawdBack.app/Contents/Resources/hooks/bash/cleanup" }] }]
+  }
+}
+```
+
+Nushell (swap `bash` for `nushell`):
+
+```json
+{
+  "hooks": {
+    "SessionStart":     [{ "hooks": [{ "type": "command", "command": "/Applications/ClawdBack.app/Contents/Resources/hooks/nushell/capture" }] }],
+    "UserPromptSubmit": [{ "hooks": [{ "type": "command", "command": "/Applications/ClawdBack.app/Contents/Resources/hooks/nushell/capture" }] }],
+    "Stop":             [{ "hooks": [{ "type": "command", "command": "/Applications/ClawdBack.app/Contents/Resources/hooks/nushell/notify" }] }],
+    "Notification":     [{ "hooks": [{ "type": "command", "command": "/Applications/ClawdBack.app/Contents/Resources/hooks/nushell/notify" }] }],
+    "SessionEnd":       [{ "hooks": [{ "type": "command", "command": "/Applications/ClawdBack.app/Contents/Resources/hooks/nushell/cleanup" }] }]
   }
 }
 ```
 
 Use whatever path the app actually lives at, `~/Applications/...` if you installed there via `make install`.
 
-Prefer your own copies (or a different shell)? The wrappers live under [`hooks/`](hooks/), one directory per shell: [`hooks/bash/`](hooks/bash/) (the set bundled into the app) and [`hooks/nushell/`](hooks/nushell/). Copy a set to `~/.claude/hooks/` and point the commands there instead.
+> **Nix users:** the flake installs the app under `~/Applications` (a `/nix/store` path rotates on rebuild). Rather than chase the bundle path, generate your own wrappers with `pkgs.writeScript` and point the hooks at their stable `~/.claude/hooks/...` symlinks. The [`hooks/nushell/`](hooks/nushell/) scripts are a ready template.
+
+Prefer your own copies, or a shell that isn't shipped? The same wrappers live under [`hooks/`](hooks/), one directory per shell: [`hooks/bash/`](hooks/bash/) and [`hooks/nushell/`](hooks/nushell/). Copy a set to `~/.claude/hooks/` and point the commands there instead.
 
 Because `open` propagates the caller's environment, `ZELLIJ_SESSION_NAME` / `ZELLIJ_PANE_ID` reach the app when the hook runs inside a Zellij pane.
 
@@ -122,9 +140,9 @@ Resources/
   Info.plist               # LSUIElement bundle, id com.hazel.clawd-back
   AppIcon.icns             # app icon
   Crabs/                   # crab images, one at random per notification
-hooks/                     # hook wrappers, one dir per shell (bundled from bash/)
-  bash/                    # capture | notify | cleanup (copied into the app bundle)
-  nushell/                 # Nushell variants of the same wrappers
+hooks/                     # hook wrappers, one dir per shell (both bundled into the app)
+  bash/                    # capture | notify | cleanup
+  nushell/                 # same wrappers, Nushell
 ```
 
 ## License
