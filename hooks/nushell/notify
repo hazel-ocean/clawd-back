@@ -1,0 +1,18 @@
+#!/usr/bin/env -S nu --stdin
+# Stop + Notification: ping and stash the locator to claw you back. The app skips
+# the banner when you are already looking at the session's window/pane.
+let input = (try { $in | from json } catch { {} })
+let event = ($input.hook_event_name? | default "")
+let message = ($input.message? | default "")
+let session_id = ($input.session_id? | default "")
+let app = ($env.HOME | path join "Applications" "ClawdBack.app")
+
+let title = (match $event {
+  "Notification" => (if ($message | is-empty) { "Claude needs your input" } else { $message })
+  "Stop" | _ => "Claude has finished and is waiting..."
+})
+let body = (if ($message | is-empty) { "Claude needs you" } else { $message })
+
+if ($app | path exists) {
+  ^open $app --args notify --title $title --message $body --session-id $session_id
+}

@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# SessionEnd: drop this session's saved window/tab state (~/.cache/clawd-back/<id>.json).
+set -euo pipefail
+read -r payload
+app="$HOME/Applications/ClawdBack.app"
+[ -d "$app" ] || exit 0
+
+sid=$(printf '%s' "$payload" | /usr/bin/plutil -extract session_id raw -o - - 2>/dev/null || true)
+[ -n "$sid" ] || exit 0
+
+open "$app" --args cleanup --session-id "$sid"

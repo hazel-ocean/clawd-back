@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# SessionStart + UserPromptSubmit: record Claude's window/tab so notify/click can
+# return to the exact window. Safe to run often - the app only saves when the
+# terminal is frontmost, which both events guarantee. Re-running on every prompt
+# refreshes the ids after a Zellij reattach moved the session to a new window.
+set -euo pipefail
+read -r payload
+app="$HOME/Applications/ClawdBack.app"
+[ -d "$app" ] || exit 0
+
+get() { printf '%s' "$payload" | /usr/bin/plutil -extract "$1" raw -o - - 2>/dev/null || true; }
+sid=$(get session_id)
+[ -n "$sid" ] || exit 0
+
+source=$(get source)
+event=$(get hook_event_name)
+case "$source" in
+  startup|resume|clear|fork) ;;
+  *) [ "$event" = "UserPromptSubmit" ] || exit 0 ;;
+esac
+
+open "$app" --args capture --session-id "$sid"

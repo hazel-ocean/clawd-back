@@ -1,0 +1,8 @@
+#!/usr/bin/env -S nu --stdin
+# SessionEnd: drop this session's saved window/tab state (~/.cache/clawd-back/<id>.json).
+let input = (try { $in | from json } catch { {} })
+let session_id = ($input.session_id? | default "")
+let app = ($env.HOME | path join "Applications" "ClawdBack.app")
+if ($session_id | is-not-empty) and ($app | path exists) {
+  ^open $app --args cleanup --session-id $session_id
+}

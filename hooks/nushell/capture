@@ -1,0 +1,14 @@
+#!/usr/bin/env -S nu --stdin
+# SessionStart + UserPromptSubmit: record Claude's window/tab so notify/click can
+# return to the exact window. Safe to run often - the app only saves when the
+# terminal is frontmost, which both events guarantee. Re-running on every prompt
+# refreshes the ids after a Zellij reattach moved the session to a new window.
+let input = (try { $in | from json } catch { {} })
+let source = ($input.source? | default "")
+let event = ($input.hook_event_name? | default "")
+let session_id = ($input.session_id? | default "")
+let app = ($env.HOME | path join "Applications" "ClawdBack.app")
+let wanted = (($source in ["startup" "resume" "clear" "fork"]) or ($event == "UserPromptSubmit"))
+if ($session_id | is-not-empty) and $wanted and ($app | path exists) {
+  ^open $app --args capture --session-id $session_id
+}

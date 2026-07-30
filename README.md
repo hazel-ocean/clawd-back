@@ -44,31 +44,31 @@ By default the app is ad-hoc signed. To use a Developer ID: `make install SIGNIN
 
 ## Claude Code hooks
 
-The app has two modes:
+The app has three modes, each driven by a Claude Code hook:
 
-- `capture --session-id <id>` on `SessionStart` (for sources `startup`, `resume`, `clear`, `fork`).
-- `notify --session-id <id> --title <t> --message <m>` on `Stop` and `Notification`.
+| Mode      | Claude hooks                     | What it does                                              |
+| --------- | -------------------------------- | -------------------------------------------------------- |
+| `capture` | `SessionStart`, `UserPromptSubmit` | Save the current window/tab for this session.            |
+| `notify`  | `Stop`, `Notification`           | Ping you (and stash the locator to claw you back).       |
+| `cleanup` | `SessionEnd`                     | Delete this session's saved state.                       |
 
-Claude Code delivers the hook payload (including `session_id`) as **JSON on stdin**, so wrap the app in a small script that reads stdin and calls it. A `notify` wrapper:
+`capture` runs on **both** `SessionStart` (initial/attach) and `UserPromptSubmit` (every turn). The per-turn re-capture keeps targeting correct after you reattach a Zellij session in a *different* terminal window: the process never restarts so `SessionStart` never re-fires, but the next prompt refreshes the saved window/tab. It only writes when the terminal is frontmost, which both events guarantee.
 
-```bash
-#!/usr/bin/env bash
-read -r payload
-sid=$(printf '%s' "$payload" | /usr/bin/plutil -extract session_id raw -o - -)
-open ~/Applications/ClawdBack.app --args notify --title "Claude" --message "Needs you" --session-id "$sid"
-```
-
-The `capture` wrapper is the same shape but calls `--args capture --session-id "$sid"` (and can gate on the payload's `source`). Point the hooks at these scripts in `~/.claude/settings.json`:
+Claude Code delivers the hook payload (including `session_id`) as **JSON on stdin**, so each mode is fronted by a tiny wrapper that reads stdin and calls the app. **Ready-made wrappers ship inside the app bundle** at `~/Applications/ClawdBack.app/Contents/Resources/hooks/{capture,notify,cleanup}`, so point your hooks straight at them, no copy-paste:
 
 ```json
 {
   "hooks": {
-    "SessionStart": [{ "hooks": [{ "type": "command", "command": "~/.claude/hooks/capture" }] }],
-    "Stop":         [{ "hooks": [{ "type": "command", "command": "~/.claude/hooks/notify" }] }],
-    "Notification": [{ "hooks": [{ "type": "command", "command": "~/.claude/hooks/notify" }] }]
+    "SessionStart":     [{ "hooks": [{ "type": "command", "command": "~/Applications/ClawdBack.app/Contents/Resources/hooks/capture" }] }],
+    "UserPromptSubmit": [{ "hooks": [{ "type": "command", "command": "~/Applications/ClawdBack.app/Contents/Resources/hooks/capture" }] }],
+    "Stop":             [{ "hooks": [{ "type": "command", "command": "~/Applications/ClawdBack.app/Contents/Resources/hooks/notify" }] }],
+    "Notification":     [{ "hooks": [{ "type": "command", "command": "~/Applications/ClawdBack.app/Contents/Resources/hooks/notify" }] }],
+    "SessionEnd":       [{ "hooks": [{ "type": "command", "command": "~/Applications/ClawdBack.app/Contents/Resources/hooks/cleanup" }] }]
   }
 }
 ```
+
+Prefer your own copies (or a different shell)? The wrappers live under [`hooks/`](hooks/), one directory per shell: [`hooks/bash/`](hooks/bash/) (the set bundled into the app) and [`hooks/nushell/`](hooks/nushell/). Copy a set to `~/.claude/hooks/` and point the commands there instead.
 
 Because `open` propagates the caller's environment, `ZELLIJ_SESSION_NAME` / `ZELLIJ_PANE_ID` reach the app when the hook runs inside a Zellij pane.
 
@@ -85,17 +85,20 @@ Defaults to `ghostty` if no config exists.
 ## How it works
 
 ```
-SessionStart  -->  open ClawdBack.app --args capture --session-id <id>
-                   saves window_id + tab_id (+ zellij session/pane)
-                   to ~/.cache/clawd-back/<id>.json
+SessionStart   -->  open ClawdBack.app --args capture --session-id <id>
+UserPromptSubmit    saves window_id + tab_id (+ zellij session/pane)
+                    to ~/.cache/clawd-back/<id>.json (only when frontmost)
 
-Stop / Notify -->  open ClawdBack.app --args notify --session-id <id> ...
-                   already viewing that window? -> skip
-                   else show notification (locator in userInfo, random crab)
+Stop / Notify  -->  open ClawdBack.app --args notify --session-id <id> ...
+                    already viewing that window? -> skip
+                    else show notification (locator in userInfo, random crab)
 
-click         -->  open -b <terminal>   (bring to front, cross-app)
-                   select saved window + tab
-                   zellij: action focus-pane-id terminal_<pane>
+click          -->  open -b <terminal>   (bring to front, cross-app)
+                    select saved window + tab
+                    zellij: action focus-pane-id terminal_<pane>
+
+SessionEnd     -->  open ClawdBack.app --args cleanup --session-id <id>
+                    removes ~/.cache/clawd-back/<id>.json
 ```
 
 Targeting is by the saved OS window id captured at `SessionStart`, so it is exact regardless of what is frontmost when a notification fires. Only Ghostty implements window/tab capture + select; other terminals fall back to activating the app (+ `focus-pane-id`).
@@ -104,7 +107,7 @@ Targeting is by the saved OS window id captured at `SessionStart`, so it is exac
 
 ```
 Sources/
-  main.swift               # mode dispatch: capture | notify | click handler
+  main.swift               # mode dispatch: capture | notify | cleanup | click handler
   AppDelegate.swift        # notification click handling
   NotificationSender.swift # capture + send, skip-when-viewing, crab attachment
   TerminalController.swift # per-terminal window/tab capture + focus
@@ -116,6 +119,9 @@ Resources/
   Info.plist               # LSUIElement bundle, id com.hazel.clawd-back
   AppIcon.icns             # app icon
   Crabs/                   # crab images, one at random per notification
+hooks/                     # hook wrappers, one dir per shell (bundled from bash/)
+  bash/                    # capture | notify | cleanup (copied into the app bundle)
+  nushell/                 # Nushell variants of the same wrappers
 ```
 
 ## License
