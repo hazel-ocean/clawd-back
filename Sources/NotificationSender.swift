@@ -30,12 +30,16 @@ func captureAndSave(args: [String]) {
   let controller = TerminalController(terminal: Terminal(rawValue: loadConfig().terminal) ?? .ghostty)
   guard controller.isFrontmostApp else { return }
   guard let loc = controller.captureFrontWindowTab() else { return }
+  // Preserve any saved zellij ids: the session name only legitimately changes on
+  // a rename (which syncs the file directly), so don't re-stale it from the
+  // spawn-time env on every UserPromptSubmit. Window/tab still refresh.
+  let existing = StateStore.load(sessionId)
   StateStore.save(
     WhipState(
       windowId: loc.window,
       tabId: loc.tab,
-      zellijSessionId: envNonEmpty("ZELLIJ_SESSION_NAME"),
-      zellijPaneId: envNonEmpty("ZELLIJ_PANE_ID")),
+      zellijSessionId: existing?.zellijSessionId ?? envNonEmpty("ZELLIJ_SESSION_NAME"),
+      zellijPaneId: existing?.zellijPaneId ?? envNonEmpty("ZELLIJ_PANE_ID")),
     sessionId: sessionId)
 }
 
