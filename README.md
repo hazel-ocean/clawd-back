@@ -4,6 +4,8 @@ A tiny macOS app that notifies you when [Claude Code](https://docs.anthropic.com
 
 It also stays quiet when you are already looking at that session, so you only get pinged when it is actually worth switching.
 
+![A Clawd Back notification banner: "Claude needs your permission", the session's last message as the body, and a random Claude Crab.](docs/notification.png)
+
 > Fork of [rvcas/claude-zellij-whip](https://github.com/rvcas/claude-zellij-whip) (MIT). The original focused on Zellij pane focus; this fork adds OS window/tab targeting, skip-when-viewing, a Nix flake, and some crabs.
 
 ## What it does
