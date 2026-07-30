@@ -3,9 +3,16 @@
   stdenv,
   swift,
   swiftpm,
+  swiftpm2nix,
   llvm,
 }:
 
+let
+  # swiftpm2nix vendors the SwiftPM dependencies (TOMLDecoder) so the build runs
+  # offline in the nix sandbox. Regenerate ./nix after changing deps:
+  #   swift package resolve && nix run nixpkgs#swiftpm2nix
+  generated = swiftpm2nix.helpers ./nix;
+in
 stdenv.mkDerivation {
   pname = "claude-zellij-whip";
   version = "1.0.0";
@@ -27,6 +34,14 @@ stdenv.mkDerivation {
     swiftpm
     llvm
   ];
+
+  # Symlink the pre-fetched dependency checkouts into .build so swift build
+  # doesn't hit the network.
+  configurePhase = ''
+    runHook preConfigure
+    ${generated.configure}
+    runHook postConfigure
+  '';
 
   buildPhase = ''
     runHook preBuild

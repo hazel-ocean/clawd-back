@@ -1,10 +1,4 @@
-import AppKit
-
-func focusTerminal(_ terminal: Terminal) {
-  let app = NSWorkspace.shared.runningApplications
-    .first { $0.bundleIdentifier == terminal.bundleIdentifier }
-  app?.activate(options: [.activateAllWindows, .activateIgnoringOtherApps])
-}
+import Foundation
 
 // Focus Claude's pane by its stable id. `focus-pane-id` also switches to the
 // pane's tab, so no separate go-to-tab step (or `room` plugin) is needed, and

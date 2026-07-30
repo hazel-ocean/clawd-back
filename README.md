@@ -123,22 +123,31 @@ The `--folder` parameter appends the project folder name to the notification tit
 ## How It Works
 
 ```
-Claude Code Hook
+SessionStart hook (startup/resume) — Claude's window is reliably frontmost
     ↓
-open ClaudeZellijWhip.app --args notify --message "..."
+open ClaudeZellijWhip.app --args capture --session-id <id>
     ↓
-App captures: $ZELLIJ_SESSION_NAME, $ZELLIJ_PANE_ID
+App records window_id + tab_id (+ zellij_session_id/zellij_pane_id in zellij)
+to ~/.cache/claude-zellij-whip/<session-id>.json
+    ⋮  (later)
+Stop / Notification hook
     ↓
-Shows macOS notification (with context in userInfo)
+open ClaudeZellijWhip.app --args notify --session-id <id> --message "..."
     ↓
-User clicks notification
+App loads the saved state. If you're already looking at Claude's window
+(front window == saved window_id, + in zellij its pane), it SKIPS. Otherwise:
     ↓
-App loads config and activates configured terminal (Ghostty or WezTerm)
+Shows macOS notification (saved locator in userInfo)
     ↓
-App runs: zellij --session <session> action focus-pane-id terminal_<pane_id>
-    ↓
-Zellij switches to the pane's tab and focuses the pane
+User clicks → app raises the saved window_id, selects tab_id,
+              and in zellij runs `action focus-pane-id terminal_<pane>`
 ```
+
+Targeting is by the **saved OS window id** captured at SessionStart (when
+Claude's window is reliably frontmost), so it's exact regardless of what's
+frontmost when a notification fires — no cwd guessing. Currently only **Ghostty**
+implements window/tab capture+focus; other terminals fall back to activating the
+app (+ `focus-pane-id` in zellij).
 
 ## Project Structure
 
@@ -147,9 +156,10 @@ claude-zellij-whip/
 ├── Sources/
 │   ├── main.swift              # Entry point, mode detection
 │   ├── AppDelegate.swift       # Notification click handling
-│   ├── NotificationSender.swift # Notification creation
-│   ├── FocusManager.swift      # Terminal/Zellij focus logic
-│   ├── Config.swift            # Configuration loading
+│   ├── NotificationSender.swift # Notification creation + tab-locator capture
+│   ├── TerminalController.swift # Per-terminal window+tab capture/focus
+│   ├── FocusManager.swift      # Zellij focus-pane-id
+│   ├── Config.swift            # Terminal-selection config loading
 │   └── ZellijContext.swift     # Zellij binary discovery
 ├── Resources/
 │   ├── Info.plist              # App bundle config (LSUIElement)
