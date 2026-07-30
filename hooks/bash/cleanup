@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # SessionEnd: drop this session's saved window/tab state (~/.cache/clawd-back/<id>.json).
 set -euo pipefail
-read -r payload
+payload=$(cat)
 app="$HOME/Applications/ClawdBack.app"
 [ -d "$app" ] || exit 0
 

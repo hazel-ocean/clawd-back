@@ -91,6 +91,8 @@ Use whatever path the app actually lives at, `~/Applications/...` if you install
 
 Prefer your own copies, or a shell that isn't shipped? The same wrappers live under [`hooks/`](hooks/), one directory per shell: [`hooks/bash/`](hooks/bash/) and [`hooks/nushell/`](hooks/nushell/). Copy a set to `~/.claude/hooks/` and point the commands there instead.
 
+The banner title states what happened (`Claude has finished and is waiting` / `Claude needs your input`); the body carries what Claude actually said, the `Notification` message or, on `Stop`, its last message pulled from the transcript. The Nushell `notify` parses the transcript natively; the bash one needs `jq` for it and otherwise falls back to a generic nudge.
+
 Because `open` propagates the caller's environment, `ZELLIJ_SESSION_NAME` / `ZELLIJ_PANE_ID` reach the app when the hook runs inside a Zellij pane.
 
 ## Configuration

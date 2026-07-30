@@ -4,7 +4,7 @@
 # terminal is frontmost, which both events guarantee. Re-running on every prompt
 # refreshes the ids after a Zellij reattach moved the session to a new window.
 set -euo pipefail
-read -r payload
+payload=$(cat)
 app="$HOME/Applications/ClawdBack.app"
 [ -d "$app" ] || exit 0
 
