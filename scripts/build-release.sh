@@ -13,5 +13,12 @@ version="${1:?usage: build-release.sh <version>}"
 make bundle
 
 mkdir -p dist
-ditto -c -k --keepParent ClawdBack.app \
-  "dist/ClawdBack-${version}-aarch64-darwin.zip"
+zip="dist/ClawdBack-${version}-aarch64-darwin.zip"
+ditto -c -k --keepParent ClawdBack.app "$zip"
+
+# Point the Homebrew cask at this release. Committed back by @semantic-release/git.
+sha="$(shasum -a 256 "$zip" | awk '{ print $1 }')"
+/usr/bin/sed -i '' \
+  -e "s|^  version \".*\"|  version \"${version}\"|" \
+  -e "s|^  sha256 \".*\"|  sha256 \"${sha}\"|" \
+  Casks/clawd-back.rb

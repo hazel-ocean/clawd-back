@@ -25,6 +25,15 @@ It also stays quiet when you are already looking at that session, so you only ge
 
 ## Install
 
+### Homebrew
+
+```bash
+brew tap hazel-ocean/clawd-back https://github.com/hazel-ocean/clawd-back
+brew install --cask clawd-back
+```
+
+Apple Silicon, macOS 13+. The build is ad-hoc signed (not notarized), so the cask strips the download quarantine on install to keep Gatekeeper from blocking first launch. Upgrade with `brew upgrade --cask clawd-back`.
+
 ### Nix (flake)
 
 ```nix
