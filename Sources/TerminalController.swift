@@ -44,10 +44,17 @@ struct TerminalController {
   // True when the user is already looking at Claude's window (and, in zellij,
   // its pane), so a notification would be noise. Precise: it compares the front
   // window id to the saved one. Conservative (false → notify) on any doubt.
-  func isViewing(savedWindow: String?, zellijSession: String?, zellijPane: String?) -> Bool {
+  func isViewing(
+    savedWindow: String?, savedTab: String?, zellijSession: String?, zellijPane: String?
+  ) -> Bool {
     guard isFrontmostApp else { return false }
     guard let savedWindow = savedWindow, !savedWindow.isEmpty else { return false }
     guard frontWindowId() == savedWindow else { return false }
+    // One Ghostty window hosts many tabs sharing a window id; confirm Claude's
+    // tab is the selected one, else a background tab reads as "viewing".
+    if let savedTab = savedTab, !savedTab.isEmpty {
+      guard frontTabId() == savedTab else { return false }
+    }
     if let session = zellijSession, !session.isEmpty, let pane = zellijPane, !pane.isEmpty {
       return zellijClientFocusedOnPane(session: session, paneId: pane)
     }
@@ -106,6 +113,11 @@ struct TerminalController {
   private func frontWindowId() -> String? {
     guard terminal == .ghostty else { return nil }
     return runOsascript(#"tell application "Ghostty" to return id of front window"#)
+  }
+
+  private func frontTabId() -> String? {
+    guard terminal == .ghostty else { return nil }
+    return runOsascript(#"tell application "Ghostty" to return id of selected tab of front window"#)
   }
 
   // Is any zellij client in `session` currently focused on Claude's pane?

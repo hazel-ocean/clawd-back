@@ -62,7 +62,8 @@ func sendNotification(args: [String]) async {
 
   // If the user is already looking at Claude's window/pane, skip the notification.
   if controller.isViewing(
-    savedWindow: windowId, zellijSession: zellijSessionId, zellijPane: zellijPaneId)
+    savedWindow: windowId, savedTab: tabId,
+    zellijSession: zellijSessionId, zellijPane: zellijPaneId)
   {
     return
   }
