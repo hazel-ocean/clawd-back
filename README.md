@@ -20,7 +20,7 @@ It also stays quiet when you are already looking at that session, so you only ge
 ## Requirements
 
 - macOS (uses `UNUserNotificationCenter` + AppKit).
-- A terminal emulator. **Ghostty** is fully supported (window + tab targeting via AppleScript). Others (`wezterm`, `iterm2`, `terminal`, `alacritty`, `kitty`) degrade to activating the app, plus Zellij pane focus.
+- A terminal emulator. **Ghostty** is fully supported (window + tab targeting via AppleScript). Others (`wezterm`, `iterm2`, `terminal`, `alacritty`, `kitty`, `rio`) degrade to activating the app, plus Zellij pane focus.
 - Optional: [Zellij](https://zellij.dev/) with the built-in `action focus-pane-id`.
 
 ## Install
@@ -111,7 +111,7 @@ Because `open` propagates the caller's environment, `ZELLIJ_SESSION_NAME` / `ZEL
 Pick a terminal in `~/.config/clawd-back/config.toml` (or `config.json`):
 
 ```toml
-terminal = "ghostty"  # ghostty | wezterm | iterm2 | terminal | alacritty | kitty
+terminal = "ghostty"  # ghostty | wezterm | iterm2 | terminal | alacritty | kitty | rio
 ```
 
 Defaults to `ghostty` if no config exists.

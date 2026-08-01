@@ -40,25 +40,22 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
       return
     }
 
-    let userInfo = response.notification.request.content.userInfo
-    let windowId = userInfo["window_id"] as? String
-    let tabId = userInfo["tab_id"] as? String
-    let zellijSession = (userInfo["zellij_session_id"] as? String).flatMap { $0.isEmpty ? nil : $0 }
-    let zellijPane = (userInfo["zellij_pane_id"] as? String).flatMap { $0.isEmpty ? nil : $0 }
-
-    let terminal = Terminal(rawValue: loadConfig().terminal) ?? .ghostty
+    let (terminalTarget, multiplexerTarget) = FocusPayload.decode(
+      response.notification.request.content.userInfo)
 
     // Raise the saved window, select its tab (falls back to app-activate), and
-    // in zellij switch the session to Claude's pane.
-    TerminalController(terminal: terminal)
-      .focus(windowId: windowId, tabId: tabId, zellijPane: zellijPane, zellijSession: zellijSession)
+    // in a multiplexer switch the session to Claude's pane.
+    clawBack(
+      term: terminalApp(for: loadConfiguredTerminal()),
+      terminalTarget: terminalTarget,
+      multiplexerTarget: multiplexerTarget)
 
     terminateApp()
   }
 
   private func terminateApp() {
-    // Quit promptly; the detached focus (spawned in TerminalController.focus)
-    // waits out this quit before touching the terminal.
+    // Quit promptly; the detached focus (spawned by clawBack) waits out this
+    // quit before touching the terminal.
     DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
       NSApplication.shared.terminate(nil)
     }

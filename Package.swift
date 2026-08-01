@@ -13,6 +13,10 @@ let package = Package(
     .executableTarget(
       name: "clawd-back",
       dependencies: ["TOMLDecoder"]
-    )
+    ),
+    .testTarget(
+      name: "clawd-backTests",
+      dependencies: ["clawd-back"]
+    ),
   ]
 )

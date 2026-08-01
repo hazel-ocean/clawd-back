@@ -1,10 +1,18 @@
 import Foundation
 
 // Where Claude is running, captured at SessionStart (when Claude's window is
-// reliably frontmost) and keyed by Claude's session id. OS-level ids
-// (window_id/tab_id) are distinguished from zellij-level ids
-// (zellij_session_id/zellij_pane_id); the zellij ones are nil outside zellij.
-struct WhipState: Codable {
+// reliably frontmost) and keyed by Claude's session id. `terminal` is nil for
+// terminals we can't address by window/tab; `multiplexer` is nil outside one.
+struct SessionState: Codable, Equatable {
+  var terminal: WindowFocusTarget?
+  var multiplexer: MultiplexerFocusTarget?
+
+  var isEmpty: Bool { terminal == nil && multiplexer == nil }
+}
+
+// The pre-protocol flat schema, kept only so a session already in flight at
+// upgrade still resolves. Decoded only when the current schema yields nothing.
+private struct LegacyState: Codable {
   var windowId: String
   var tabId: String
   var zellijSessionId: String?
@@ -15,6 +23,19 @@ struct WhipState: Codable {
     case tabId = "tab_id"
     case zellijSessionId = "zellij_session_id"
     case zellijPaneId = "zellij_pane_id"
+  }
+
+  func migrated() -> SessionState {
+    let terminal =
+      windowId.isEmpty
+      ? nil : WindowFocusTarget(window: windowId, tab: tabId.isEmpty ? nil : tabId)
+    var multiplexer: MultiplexerFocusTarget?
+    if let session = zellijSessionId, !session.isEmpty,
+      let pane = zellijPaneId, !pane.isEmpty
+    {
+      multiplexer = MultiplexerFocusTarget(kind: .zellij, session: session, pane: pane)
+    }
+    return SessionState(terminal: terminal, multiplexer: multiplexer)
   }
 }
 
@@ -29,14 +50,30 @@ enum StateStore {
     return dir.appendingPathComponent("\(safe).json")
   }
 
-  static func save(_ state: WhipState, sessionId: String) {
-    guard let url = fileURL(sessionId), let data = try? JSONEncoder().encode(state) else { return }
+  static func save(_ state: SessionState, sessionId: String) {
+    guard !state.isEmpty, let url = fileURL(sessionId),
+      let data = try? JSONEncoder().encode(state)
+    else { return }
     try? data.write(to: url)
   }
 
-  static func load(_ sessionId: String) -> WhipState? {
+  static func load(_ sessionId: String) -> SessionState? {
     guard let url = fileURL(sessionId), let data = try? Data(contentsOf: url) else { return nil }
-    return try? JSONDecoder().decode(WhipState.self, from: data)
+    return decode(data)
+  }
+
+  // Split from load so migration is testable without the filesystem.
+  static func decode(_ data: Data) -> SessionState? {
+    // All-optional fields mean a legacy file decodes vacuously into an empty
+    // SessionState; treat empty as a miss and retry the old schema.
+    if let state = try? JSONDecoder().decode(SessionState.self, from: data), !state.isEmpty {
+      return state
+    }
+    if let legacy = try? JSONDecoder().decode(LegacyState.self, from: data) {
+      let migrated = legacy.migrated()
+      return migrated.isEmpty ? nil : migrated
+    }
+    return nil
   }
 
   static func clear(_ sessionId: String) {
