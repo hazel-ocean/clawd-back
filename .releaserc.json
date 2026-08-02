@@ -6,7 +6,7 @@
     [
       "@semantic-release/exec",
       {
-        "prepareCmd": "./scripts/build-release.sh ${nextRelease.version}"
+        "prepareCmd": "./scripts/build-release.nu ${nextRelease.version}"
       }
     ],
     [

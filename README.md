@@ -42,15 +42,15 @@ inputs.clawd-back.url = "github:hazel-ocean/clawd-back";
 
 The flake exposes `packages.default` (an `.app` under `$out/Applications`). Install it where LaunchServices can find it, for example a home-manager activation that copies it to `~/Applications`, re-signs ad-hoc, and runs `lsregister`.
 
-### Make
+### Just
 
 ```bash
 git clone https://github.com/hazel-ocean/clawd-back
 cd clawd-back
-make install   # builds, bundles, signs, installs to ~/Applications/ClawdBack.app
+just install   # builds, bundles, signs, installs to ~/Applications/ClawdBack.app
 ```
 
-By default the app is ad-hoc signed. To use a Developer ID: `make install SIGNING_IDENTITY="Apple Development: You (XXXXXXXXXX)"`.
+By default the app is ad-hoc signed. To use a Developer ID: `just install signing_identity="Apple Development: You (XXXXXXXXXX)"`.
 
 > First time you click a notification, macOS asks for permission to control Ghostty (Automation). Grant it. An ad-hoc re-sign on rebuild can reset that grant; the app still comes to the front regardless, only the tab-select needs it.
 
@@ -96,7 +96,7 @@ Nushell (swap `bash` for `nushell`):
 }
 ```
 
-Use whatever path the app actually lives at, `~/Applications/...` if you installed there via `make install`.
+Use whatever path the app actually lives at, `~/Applications/...` if you installed there via `just install`.
 
 > **Nix users:** the flake installs the app under `~/Applications` (a `/nix/store` path rotates on rebuild). Rather than chase the bundle path, generate your own wrappers with `pkgs.writeScript` and point the hooks at their stable `~/.claude/hooks/...` symlinks. The [`hooks/nushell/`](hooks/nushell/) scripts are a ready template.
 

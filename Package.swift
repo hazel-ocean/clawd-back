@@ -12,7 +12,11 @@ let package = Package(
   targets: [
     .executableTarget(
       name: "clawd-back",
-      dependencies: ["TOMLDecoder"]
+      dependencies: ["TOMLDecoder"],
+      exclude: [
+        "Ghostty/ghostty-front-target.applescript",
+        "Ghostty/ghostty-focus.applescript",
+      ]
     ),
     .testTarget(
       name: "clawd-backTests",

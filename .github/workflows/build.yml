@@ -14,16 +14,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: extractions/setup-just@v2
+
       - name: Show toolchain
         run: |
           swift --version
+          just --version
           uname -m
 
       - name: Build release
-        run: make release
+        run: just release
 
       - name: Bundle app
-        run: make bundle
+        run: just bundle
 
       - name: Verify architecture
         run: |

@@ -5,14 +5,14 @@ func shq(_ s: String) -> String {
   "'" + s.replacingOccurrences(of: "'", with: "'\\''") + "'"
 }
 
-// Escape a value for embedding inside an AppleScript double-quoted string.
-func escAS(_ s: String) -> String {
-  s.replacingOccurrences(of: "\\", with: "\\\\")
-    .replacingOccurrences(of: "\"", with: "\\\"")
-}
-
-func runOsascript(_ script: String) -> String? {
-  runProcess("/usr/bin/osascript", ["-e", script])
+// Absolute path to a file under the bundle's Resources, or nil when unbundled
+// (swift build / tests) or missing.
+func bundledResource(_ relativePath: String) -> String? {
+  guard
+    let url = Bundle.main.resourceURL?.appendingPathComponent(relativePath),
+    FileManager.default.fileExists(atPath: url.path)
+  else { return nil }
+  return url.path
 }
 
 func runProcess(_ path: String, _ args: [String]) -> String? {

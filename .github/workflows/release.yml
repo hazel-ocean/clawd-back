@@ -29,6 +29,12 @@ jobs:
         with:
           node-version: 20
 
+      - uses: extractions/setup-just@v2
+
+      - uses: hustcer/setup-nu@v3
+        with:
+          version: "0.114.1"
+
       - name: Semantic release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

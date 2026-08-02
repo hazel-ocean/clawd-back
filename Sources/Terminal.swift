@@ -52,8 +52,8 @@ extension TerminalApp {
 
 // Capability: read the current window/tab and select a specific one. Only a
 // terminal that exposes stable window/tab ids and a way to select them can
-// conform; today that is Ghostty (via its AppleScript dictionary). Terminals
-// without it degrade to activation only.
+// conform; today that is Ghostty (see Ghostty.swift, via its AppleScript
+// dictionary). Terminals without it degrade to activation only.
 protocol WindowFocus: TerminalApp {
   // The front window+tab right now. Used both to capture at SessionStart and to
   // compare for skip-when-viewing.
@@ -61,41 +61,6 @@ protocol WindowFocus: TerminalApp {
 
   // Shell steps that raise `target`'s window and select its tab.
   func focusSteps(for target: WindowFocusTarget) -> [String]
-}
-
-struct Ghostty: WindowFocus {
-  let kind = Terminal.ghostty
-  var bundleIdentifier: String { kind.bundleIdentifier }
-
-  func frontTarget() -> WindowFocusTarget? {
-    guard
-      let out = runOsascript(
-        """
-        tell application "Ghostty"
-          set w to front window
-          return (id of w) & "\t" & (id of selected tab of w)
-        end tell
-        """), out.contains("\t")
-    else { return nil }
-    let p = out.components(separatedBy: "\t")
-    return p.count == 2 ? WindowFocusTarget(window: p[0], tab: p[1]) : nil
-  }
-
-  func focusSteps(for target: WindowFocusTarget) -> [String] {
-    var lines = [
-      "tell application \"Ghostty\"",
-      "activate window (window id \"\(escAS(target.window))\")",
-    ]
-    if let tab = target.tab, !tab.isEmpty {
-      lines.append(
-        "select tab (tab id \"\(escAS(tab))\" of window id \"\(escAS(target.window))\")")
-    }
-    lines.append("end tell")
-    let script = lines.joined(separator: "\n")
-    let tmp = NSTemporaryDirectory() + "czw-focus-\(UUID().uuidString).applescript"
-    try? script.write(toFile: tmp, atomically: true, encoding: .utf8)
-    return ["/usr/bin/osascript \(shq(tmp))", "rm -f \(shq(tmp))"]
-  }
 }
 
 // A terminal we can raise but not address by window/tab. Everything but Ghostty
