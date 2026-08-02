@@ -42,9 +42,14 @@ func isViewing(
   return confirmed
 }
 
-// The ordered steps that raise the saved window, select its tab, and (in a
-// multiplexer) focus the pane. Split from clawBack so the composition is
-// testable without running anything.
+// The ordered steps that focus the multiplexer pane, then raise the saved window
+// and select its tab. Split from clawBack so the composition is testable without
+// running anything.
+//
+// Ordering matters: the last activation wins for OS focus. The multiplexer focus
+// is a session-state change with no OS-focus effect, so it goes first; the
+// terminal window raise goes LAST so nothing steals the window back afterward
+// (an earlier ordering ran the pane focus last and the window lost frontmost).
 func focusPlan(
   term: any TerminalApp,
   terminalTarget: WindowFocusTarget?,
@@ -60,12 +65,12 @@ func focusPlan(
   // Wait out this app's ~0.1s self-terminate so the focus lands after we've quit
   // and the terminal has settled (otherwise our quit resets the tab).
   plan.add("sleep 0.3")
+  if let target = multiplexerTarget {
+    plan.add(resolveMultiplexer(target.kind).focusSteps(for: target))
+  }
   plan.add(term.activationStep())
   if let wf = term as? WindowFocus, let target = terminalTarget {
     plan.add(wf.focusSteps(for: target))
-  }
-  if let target = multiplexerTarget {
-    plan.add(resolveMultiplexer(target.kind).focusSteps(for: target))
   }
   return plan
 }

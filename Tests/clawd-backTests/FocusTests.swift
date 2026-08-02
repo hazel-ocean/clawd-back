@@ -53,17 +53,23 @@ final class FocusPlanTests: XCTestCase {
       resolveMultiplexer: resolve(mux))
     XCTAssertEqual(
       plan.steps,
-      ["sleep 0.3", "/usr/bin/open -b '\(Terminal.rio.bundleIdentifier)'", "FOCUS"])
+      ["sleep 0.3", "FOCUS", "/usr/bin/open -b '\(Terminal.rio.bundleIdentifier)'"])
   }
 
-  func testWindowBeforeMultiplexer() {
+  func testMultiplexerBeforeWindowSoWindowRaiseIsLast() {
     let term = FakeWindowTerminal(
       kind: .ghostty, isFrontmost: false, front: nil, steps: ["SELECT"])
     let mux = FakeMux(kind: .zellij, focused: false, steps: ["FOCUS"])
     let plan = focusPlan(
       term: term, terminalTarget: winTarget, multiplexerTarget: muxTarget,
       resolveMultiplexer: resolve(mux))
-    XCTAssertEqual(plan.steps.suffix(2), ["SELECT", "FOCUS"])
+    // Pane focus first (session state), window raise last (wins OS focus).
+    XCTAssertEqual(
+      plan.steps,
+      [
+        "sleep 0.3", "FOCUS",
+        "/usr/bin/open -b '\(Terminal.ghostty.bundleIdentifier)'", "SELECT",
+      ])
   }
 
   func testNothingToFocusIsEmpty() {
