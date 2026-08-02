@@ -58,7 +58,7 @@ struct Zellij: MultiplexerFocus {
   func focusSteps(for target: MultiplexerFocusTarget) -> [String] {
     guard let zellij = findZellijPath() else { return [] }
     return [
-      "\(shq(zellij)) --session \(shq(target.session)) action focus-pane-id terminal_\(shq(target.pane))"
+      "\(shq(zellij)) --session \(shq(target.session)) action focus-pane-id \(shq("terminal_\(target.pane)"))"
     ]
   }
 }
