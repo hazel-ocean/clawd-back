@@ -28,11 +28,10 @@ bundle: release
     @mkdir -p {{bundle_name}}/Contents/MacOS
     @mkdir -p {{bundle_name}}/Contents/Resources
     @cp .build/release/{{executable_name}} {{bundle_name}}/Contents/MacOS/
-    @cp Resources/Info.plist {{bundle_name}}/Contents/
-    @cp Resources/AppIcon.icns {{bundle_name}}/Contents/Resources/
-    @cp -R Resources/Crabs {{bundle_name}}/Contents/Resources/
-    @mkdir -p {{bundle_name}}/Contents/Resources/Ghostty
-    @cp Sources/Ghostty/*.applescript {{bundle_name}}/Contents/Resources/Ghostty/
+    @cp -R Resources/. {{bundle_name}}/Contents/Resources/
+    @mv {{bundle_name}}/Contents/Resources/Info.plist {{bundle_name}}/Contents/
+    @rm -f {{bundle_name}}/Contents/Resources/entitlements.plist
+    @find Sources -name '*.applescript' -exec sh -c 'd="{{bundle_name}}/Contents/Resources/$(dirname "${1#Sources/}")"; mkdir -p "$d"; cp "$1" "$d/"' _ {} \;
     @cp -R hooks {{bundle_name}}/Contents/Resources/
     @chmod +x {{bundle_name}}/Contents/Resources/hooks/*/*
     @echo "App bundle created: {{bundle_name}}"

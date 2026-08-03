@@ -55,9 +55,21 @@ stdenv.mkDerivation {
     app="$out/Applications/ClawdBack.app"
     mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
     cp .build/release/clawd-back "$app/Contents/MacOS/"
-    cp Resources/Info.plist "$app/Contents/"
-    cp Resources/AppIcon.icns "$app/Contents/Resources/"
-    cp -R Resources/Crabs "$app/Contents/Resources/"
+
+    # Whole Resources tree, then relocate Info.plist to Contents/ and drop the
+    # signing-only entitlements. Wildcarded so new assets ship without edits.
+    cp -R Resources/. "$app/Contents/Resources/"
+    mv "$app/Contents/Resources/Info.plist" "$app/Contents/"
+    rm -f "$app/Contents/Resources/entitlements.plist"
+
+    # Every terminal's AppleScripts, preserving their per-terminal subdir so
+    # bundledResource("<Term>/<script>") resolves. Wildcarded, not enumerated.
+    find Sources -name '*.applescript' | while read -r f; do
+      rel="''${f#Sources/}"
+      mkdir -p "$app/Contents/Resources/$(dirname "$rel")"
+      cp "$f" "$app/Contents/Resources/$rel"
+    done
+
     cp -R hooks "$app/Contents/Resources/"
     chmod +x "$app/Contents/Resources/hooks/"*/*
     runHook postInstall
