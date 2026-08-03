@@ -89,7 +89,8 @@ func sendNotification(args: [String]) async {
   // Break through Focus modes (needs the time-sensitive entitlement + signing).
   content.interruptionLevel = .timeSensitive
   content.userInfo = FocusPayload.userInfo(
-    terminal: terminalTarget, multiplexer: multiplexerTarget)
+    terminal: terminalTarget, multiplexer: multiplexerTarget,
+    title: baseTitle, message: message, folder: folder)
   if let crab = randomCrabAttachment() {
     content.attachments = [crab]
   }

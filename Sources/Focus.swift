@@ -75,35 +75,33 @@ func focusPlan(
   return plan
 }
 
-func clawBack(
-  term: any TerminalApp,
-  terminalTarget: WindowFocusTarget?,
-  multiplexerTarget: MultiplexerFocusTarget?
-) {
-  focusPlan(
-    term: term, terminalTarget: terminalTarget, multiplexerTarget: multiplexerTarget
-  ).runDetached()
-}
-
 // Bridges the focus targets through the notification's userInfo, which must hold
 // plist types; each target rides across as its JSON string (empty when absent).
 enum FocusPayload {
+  // message/folder ride along so the click handler, a fresh process with only
+  // this userInfo, can rebuild the locator notification without the state store.
   static func userInfo(
-    terminal: WindowFocusTarget?, multiplexer: MultiplexerFocusTarget?
+    terminal: WindowFocusTarget?, multiplexer: MultiplexerFocusTarget?,
+    title: String, message: String, folder: String?
   ) -> [String: Any] {
     [
       "terminal_target": encodeJSON(terminal),
       "multiplexer_target": encodeJSON(multiplexer),
+      "title": title,
+      "message": message,
+      "folder": folder ?? "",
     ]
   }
 
-  static func decode(
-    _ userInfo: [AnyHashable: Any]
-  ) -> (terminal: WindowFocusTarget?, multiplexer: MultiplexerFocusTarget?) {
-    (
-      decodeJSON(WindowFocusTarget.self, from: userInfo["terminal_target"] as? String),
-      decodeJSON(MultiplexerFocusTarget.self, from: userInfo["multiplexer_target"] as? String)
-    )
+  static func decode(_ userInfo: [AnyHashable: Any]) -> FocusState {
+    let folder = userInfo["folder"] as? String
+    return FocusState(
+      terminal: decodeJSON(WindowFocusTarget.self, from: userInfo["terminal_target"] as? String),
+      multiplexer: decodeJSON(
+        MultiplexerFocusTarget.self, from: userInfo["multiplexer_target"] as? String),
+      title: userInfo["title"] as? String ?? "Claude Code",
+      message: userInfo["message"] as? String ?? "",
+      folder: (folder?.isEmpty ?? true) ? nil : folder)
   }
 }
 

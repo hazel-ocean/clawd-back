@@ -59,6 +59,9 @@ protocol WindowFocus: TerminalApp {
   // compare for skip-when-viewing.
   func frontTarget() -> WindowFocusTarget?
 
+  // Does the captured window still exist? False ⇒ claw-back can't land on it.
+  func windowExists(_ window: String) -> Bool
+
   // Shell steps that raise `target`'s window and select its tab.
   func focusSteps(for target: WindowFocusTarget) -> [String]
 }

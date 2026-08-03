@@ -16,6 +16,7 @@ let package = Package(
       exclude: [
         "Ghostty/ghostty-front-target.applescript",
         "Ghostty/ghostty-focus.applescript",
+        "Ghostty/ghostty-window-exists.applescript",
       ]
     ),
     .testTarget(

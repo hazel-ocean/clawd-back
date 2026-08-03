@@ -27,6 +27,10 @@ protocol MultiplexerFocus {
   // Is any client currently focused on `target`'s pane? (skip-when-viewing)
   func isFocused(on target: MultiplexerFocusTarget) -> Bool
 
+  // Is any client attached to `target`'s session at all? False ⇒ detached, so a
+  // pane focus would be invisible.
+  func isAttached(on target: MultiplexerFocusTarget) -> Bool
+
   // Shell steps that focus `target`'s pane.
   func focusSteps(for target: MultiplexerFocusTarget) -> [String]
 }
@@ -50,6 +54,17 @@ struct Zellij: MultiplexerFocus {
     let needle = "terminal_\(target.pane)"
     return out.split(separator: "\n").dropFirst().contains { line in
       line.split(whereSeparator: { $0 == " " || $0 == "\t" }).contains { String($0) == needle }
+    }
+  }
+
+  // Any data row past the header means a client is attached; no row (or an error
+  // because the session is gone) means detached.
+  func isAttached(on target: MultiplexerFocusTarget) -> Bool {
+    guard let zellij = findZellijPath(),
+      let out = runProcess(zellij, ["--session", target.session, "action", "list-clients"])
+    else { return false }
+    return out.split(separator: "\n").dropFirst().contains {
+      !$0.trimmingCharacters(in: .whitespaces).isEmpty
     }
   }
 

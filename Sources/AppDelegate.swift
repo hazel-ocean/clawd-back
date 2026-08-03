@@ -40,17 +40,26 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
       return
     }
 
-    let (terminalTarget, multiplexerTarget) = FocusPayload.decode(
-      response.notification.request.content.userInfo)
+    let state = FocusPayload.decode(response.notification.request.content.userInfo)
+    let term = terminalApp(for: loadConfiguredTerminal())
 
-    // Raise the saved window, select its tab (falls back to app-activate), and
-    // in a multiplexer switch the session to Claude's pane.
-    clawBack(
-      term: terminalApp(for: loadConfiguredTerminal()),
-      terminalTarget: terminalTarget,
-      multiplexerTarget: multiplexerTarget)
-
-    terminateApp()
+    switch resolveFocus(
+      term: term, terminalTarget: state.terminal, multiplexerTarget: state.multiplexer)
+    {
+    case .focus(let plan):
+      // Raise the saved window, select its tab, and in a multiplexer switch the
+      // session to Claude's pane.
+      plan.runDetached()
+      terminateApp()
+    case .failure(let reason):
+      // Couldn't reach the session: post the locator notification, then quit
+      // once it's delivered.
+      Task {
+        await handleFocusFailure(reason, state: state, as: .notify)
+        try? await Task.sleep(for: .milliseconds(300))
+        await MainActor.run { NSApplication.shared.terminate(nil) }
+      }
+    }
   }
 
   private func terminateApp() {
