@@ -25,7 +25,7 @@ has something to diff against.
 | Setting | Current default | Options |
 | --- | --- | --- |
 | Terminal | `ghostty` (already file-configurable) | ghostty \| wezterm \| iterm2 \| terminal \| alacritty \| kitty \| rio (shipped) |
-| Detached-session strategy | spawn a fresh surface | spawn fresh \| reuse captured window (switch its session) \| reuse-if-possible-else-spawn |
+| Focus-failure response (unreachable click) | notify (locate the session) | notify \| spawn a fresh surface \| switch captured window's session |
 | New-surface placement | fullscreen -> new tab, else new window | smart (that rule, default) \| always a new window \| always a new tab |
 | Skip-when-viewing | on | on \| off |
 | Notification interruption level | `timeSensitive` | passive \| active \| timeSensitive \| critical |
@@ -36,26 +36,27 @@ has something to diff against.
 
 Plan: [docs/plans/configuration.md](docs/plans/configuration.md).
 
-## Detached / moved session handling
-
-When the captured Ghostty window no longer shows the session - because it was
-detached, reattached elsewhere, or closed - claw-back opens the session in a
-fresh surface instead of failing: a new tab when the reference window is
-fullscreen, a new window otherwise. This establishes the "Detached-session
-strategy" and "New-surface placement" defaults in the table above.
-
-Plan: [docs/plans/reuse-or-spawn-claw-back.md](docs/plans/reuse-or-spawn-claw-back.md).
-
 ## Cross-Space and external-display focus
 
-Clicking a notification does not reliably travel to the session's window when it
-lives on another Mission Control Space or a second monitor: `open -b` and
-AppleScript `activate window` activate the app but cannot command WindowServer to
-switch to that window's Space (advisory activation on macOS 14+, and the
-per-display Spaces model). The robust fix is the private SkyLight sequence
-(`_SLPSSetFrontProcessWithOptions` with the target `CGWindowID`, a synthetic
-key-window event, then `AXRaise`) that switchers like AltTab use, which requires
-moving the focus in-process and capturing the window's `CGWindowID`.
+Clicking a notification now reliably surfaces the session's window, tab, and pane
+across Spaces and displays: Ghostty's `focus` verb brings the window to the front
+(unlike AppKit `activate window`), and dropping the redundant, async `open -b`
+stops the raise from bouncing keyboard focus to another display's window.
+
+What it does not yet do is choose *how* it surfaces an off-Space window: `focus`
+pulls the window onto the currently-focused Space instead of switching to the
+Space that already holds it, so a click rearranges your desktops (the window
+jumps from its Desktop to your current one). The wanted behavior is to switch the
+display to the window's Space and leave the window put. Two levers:
+
+- Global (affects all app switching): `com.apple.spaces
+  AppleSpacesSwitchOnActivate` (off by default) makes activation travel to the
+  Space that has the window rather than pulling it.
+- Per-claw-back, no global change: the private SkyLight sequence
+  (`_SLPSSetFrontProcessWithOptions` with the target `CGWindowID`, a synthetic
+  key-window event, then `AXRaise`) that switchers like AltTab use, which
+  switches to the specific window's Space as a side effect. Requires moving focus
+  in-process and capturing the window's `CGWindowID`.
 
 Plan: [docs/plans/external-display-focus.md](docs/plans/external-display-focus.md).
 
