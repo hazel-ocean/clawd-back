@@ -3,12 +3,12 @@ on run argv
   set tabId to ""
   if (count of argv) > 1 then set tabId to item 2 of argv
   tell application "Ghostty"
-    -- `focus` lands the exact window (Ghostty-native, unlike AppKit `activate
-    -- window`); the explicit `select tab` guarantees the tab even in cases
-    -- where focus's implicit tab switch doesn't hold.
+    -- `focus` runs LAST so the terminal surface ends as first responder
+    -- (else keystrokes hit no key surface and the bell rings); the earlier
+    -- `select tab` is the belt-and-suspenders tab guarantee.
     if tabId is not "" then
-      focus (first terminal of tab id tabId of window id windowId)
       select tab (tab id tabId of window id windowId)
+      focus (first terminal of tab id tabId of window id windowId)
     else
       focus (first terminal of window id windowId)
     end if
