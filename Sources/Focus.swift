@@ -68,9 +68,14 @@ func focusPlan(
   if let target = multiplexerTarget {
     plan.add(resolveMultiplexer(target.kind).focusSteps(for: target))
   }
-  plan.add(term.activationStep())
+  // A window raise brings the app forward itself (Ghostty's `focus`), so the
+  // extra `open -b` activation is redundant and, being async, can land after the
+  // raise and steal focus back, e.g. to another display's window. Activate only
+  // when no window raise will run (baseline terminals, or a mux-only target).
   if let wf = term as? WindowFocus, let target = terminalTarget {
     plan.add(wf.focusSteps(for: target))
+  } else {
+    plan.add(term.activationStep())
   }
   return plan
 }

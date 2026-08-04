@@ -44,9 +44,8 @@ final class FocusPlanTests: XCTestCase {
       kind: .ghostty, isFrontmost: false, front: nil, steps: ["SELECT"])
     let plan = focusPlan(
       term: term, terminalTarget: winTarget, multiplexerTarget: nil)
-    XCTAssertEqual(
-      plan.steps,
-      ["sleep 0.3", "/usr/bin/open -b '\(Terminal.ghostty.bundleIdentifier)'", "SELECT"])
+    // A window raise self-activates, so no open -b step.
+    XCTAssertEqual(plan.steps, ["sleep 0.3", "SELECT"])
   }
 
   func testMultiplexerOnlyPlanOnBaselineTerminal() {
@@ -67,13 +66,9 @@ final class FocusPlanTests: XCTestCase {
     let plan = focusPlan(
       term: term, terminalTarget: winTarget, multiplexerTarget: muxTarget,
       resolveMultiplexer: resolve(mux))
-    // Pane focus first (session state), window raise last (wins OS focus).
-    XCTAssertEqual(
-      plan.steps,
-      [
-        "sleep 0.3", "FOCUS",
-        "/usr/bin/open -b '\(Terminal.ghostty.bundleIdentifier)'", "SELECT",
-      ])
+    // Pane focus first (session state), window raise last (wins OS focus);
+    // the raise self-activates, so no open -b.
+    XCTAssertEqual(plan.steps, ["sleep 0.3", "FOCUS", "SELECT"])
   }
 
   func testNothingToFocusIsEmpty() {
@@ -141,12 +136,7 @@ final class ResolveFocusTests: XCTestCase {
     let outcome = resolveFocus(
       term: term, terminalTarget: winTarget, multiplexerTarget: muxTarget,
       resolveMultiplexer: resolve(mux))
-    XCTAssertEqual(
-      plan(outcome)?.steps,
-      [
-        "sleep 0.3", "FOCUS",
-        "/usr/bin/open -b '\(Terminal.ghostty.bundleIdentifier)'", "SELECT",
-      ])
+    XCTAssertEqual(plan(outcome)?.steps, ["sleep 0.3", "FOCUS", "SELECT"])
   }
 
   func testBaselineNoMultiplexerResolvesToFocus() {
