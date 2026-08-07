@@ -22,7 +22,7 @@ struct FocusState: Equatable {
   var folder: String?
 }
 
-// Configurable reaction to a FocusFailure, decoded from config like Terminal.
+// Configurable reaction to a FocusFailure, decoded from config like Application.
 // Only .notify today; spawn / newTab / switchSession slot in with the config
 // schema (docs/plans/configuration.md).
 enum FocusFailureResponse: String, Codable, CaseIterable {
@@ -32,7 +32,7 @@ enum FocusFailureResponse: String, Codable, CaseIterable {
 // A detached session is the more actionable failure (we can name the reattach),
 // so it wins over a gone window. A reachable target yields today's focus plan.
 func resolveFocus(
-  term: any TerminalApp,
+  term: any AppActivation,
   terminalTarget: WindowFocusTarget?,
   multiplexerTarget: MultiplexerFocusTarget?,
   resolveMultiplexer: (MultiplexerKind) -> any MultiplexerFocus = multiplexer(for:)

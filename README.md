@@ -21,7 +21,7 @@ It also stays quiet when you are already looking at that session, so you only ge
 ## Requirements
 
 - macOS (uses `UNUserNotificationCenter` + AppKit).
-- A terminal emulator. **Ghostty** is fully supported (window + tab targeting via AppleScript). Others (`wezterm`, `iterm2`, `terminal`, `alacritty`, `kitty`, `rio`) degrade to activating the app, plus Zellij pane focus.
+- A terminal emulator, or any other app you run Claude Code from. **Ghostty** is fully supported (window + tab targeting via AppleScript). The other named terminals (`wezterm`, `iterm2`, `terminal`, `alacritty`, `kitty`, `rio`) degrade to activating the app, plus Zellij pane focus. Any other app (e.g. an editor with an embedded terminal) can be configured as `generic`, which raises its actual window via generic Accessibility scripting instead of just activating the app — see [Configuration](#configuration).
 - Optional: [Zellij](https://zellij.dev/) with the built-in `action focus-pane-id`.
 
 ## Install
@@ -54,6 +54,8 @@ just install   # builds, bundles, signs, installs to ~/Applications/ClawdBack.ap
 By default the app is ad-hoc signed. To use a Developer ID: `just install signing_identity="Apple Development: You (XXXXXXXXXX)"`.
 
 > First time you click a notification, macOS asks for permission to control Ghostty (Automation). Grant it. An ad-hoc re-sign on rebuild can reset that grant; the app still comes to the front regardless, only the tab-select needs it.
+>
+> If you configure `application = "generic"` (see [Configuration](#configuration)), a second, distinct permission is needed: **Accessibility** (System Settings → Privacy & Security → Accessibility), since raising another app's window this way goes through System Events. Without it, ClawdBack still activates the app via `open -b`, just without raising the specific window.
 
 ## Claude Code hooks
 
@@ -109,13 +111,27 @@ Because `open` propagates the caller's environment, `ZELLIJ_SESSION_NAME` / `ZEL
 
 ## Configuration
 
-Pick a terminal in `~/.config/clawd-back/config.toml` (or `config.json`):
+Pick the app to claw back to in `~/.config/clawd-back/config.toml` (or `config.json`):
 
 ```toml
-terminal = "ghostty"  # ghostty | wezterm | iterm2 | terminal | alacritty | kitty | rio
+application = "ghostty"  # ghostty | wezterm | iterm2 | terminal | alacritty | kitty | rio | generic
 ```
 
 Defaults to `ghostty` if no config exists.
+
+For any app without an AppleScript dictionary (anything other than Ghostty
+that isn't one of the named terminals above), use `generic` with its bundle
+id:
+
+```toml
+application = "generic"
+bundleIdentifier = "com.example.SomeApp"
+```
+
+This addresses the app's window by title via generic Accessibility scripting
+rather than a stable id, so it's best-effort: it needs the Accessibility
+permission above, and a window whose title changes between capture and click
+is reported as closed rather than raised.
 
 ## How it works
 
@@ -136,7 +152,7 @@ SessionEnd     -->  open ClawdBack.app --args cleanup --session-id <id>
                     removes ~/.cache/clawd-back/<id>.json
 ```
 
-Targeting is by the saved OS window id captured at `SessionStart`, so it is exact regardless of what is frontmost when a notification fires. Only Ghostty implements window/tab capture + select; other terminals fall back to activating the app (+ `focus-pane-id`).
+Targeting is by the saved OS window id captured at `SessionStart`, so it is exact regardless of what is frontmost when a notification fires. Ghostty implements window/tab capture + select via its own AppleScript dictionary; `generic` implements window capture + raise via System Events/Accessibility (title-based, best-effort); the other named terminals fall back to activating the app (+ `focus-pane-id`).
 
 ## Project layout
 
@@ -147,7 +163,7 @@ Sources/
   NotificationSender.swift # capture + send, skip-when-viewing, crab attachment
   TerminalController.swift # per-terminal window/tab capture + focus
   StateStore.swift         # ~/.cache/clawd-back/<id>.json
-  Config.swift             # terminal-selection config (TOML/JSON)
+  Config.swift             # app-selection config (TOML/JSON)
   ZellijContext.swift      # zellij binary discovery
   FocusManager.swift       # zellij focus-pane-id
 Resources/

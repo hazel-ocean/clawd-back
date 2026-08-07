@@ -2,12 +2,16 @@ import Foundation
 import TOMLDecoder
 
 struct AppConfig: Codable {
-  let terminal: String
+  let application: String
+  // Required when application == "generic": the bundle id of the app to
+  // claw back to, since .generic has no fixed identity of its own.
+  let bundleIdentifier: String?
 }
 
-// The configured terminal from ~/.config/clawd-back/config.{toml,json}, or
-// .ghostty when there's no valid config.
-func loadConfiguredTerminal() -> Terminal {
+// The configured app to claw back to, from ~/.config/clawd-back/config.{toml,json},
+// resolved to its concrete driver. Falls back to Ghostty when there's no
+// valid config.
+func loadConfiguredApp() -> any AppActivation {
   let configDir = FileManager.default.homeDirectoryForCurrentUser
     .appendingPathComponent(".config/clawd-back", isDirectory: true)
 
@@ -16,17 +20,17 @@ func loadConfiguredTerminal() -> Terminal {
 
   if let data = try? Data(contentsOf: tomlPath),
     let config = try? TOMLDecoder().decode(AppConfig.self, from: data),
-    let terminal = Terminal(rawValue: config.terminal)
+    let application = Application(rawValue: config.application)
   {
-    return terminal
+    return resolvedApp(for: application, bundleIdentifier: config.bundleIdentifier)
   }
 
   if let data = try? Data(contentsOf: jsonPath),
     let config = try? JSONDecoder().decode(AppConfig.self, from: data),
-    let terminal = Terminal(rawValue: config.terminal)
+    let application = Application(rawValue: config.application)
   {
-    return terminal
+    return resolvedApp(for: application, bundleIdentifier: config.bundleIdentifier)
   }
 
-  return .ghostty
+  return Ghostty()
 }

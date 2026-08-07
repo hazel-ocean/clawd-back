@@ -24,7 +24,7 @@ struct FocusPlan {
 // would be noise. Skips only when a capability POSITIVELY confirms the exact
 // window/pane; a bare frontmost app we can't address still notifies.
 func isViewing(
-  term: any TerminalApp,
+  term: any AppActivation,
   terminalTarget: WindowFocusTarget?,
   multiplexerTarget: MultiplexerFocusTarget?,
   resolveMultiplexer: (MultiplexerKind) -> any MultiplexerFocus = multiplexer(for:)
@@ -51,7 +51,7 @@ func isViewing(
 // terminal window raise goes LAST so nothing steals the window back afterward
 // (an earlier ordering ran the pane focus last and the window lost frontmost).
 func focusPlan(
-  term: any TerminalApp,
+  term: any AppActivation,
   terminalTarget: WindowFocusTarget?,
   multiplexerTarget: MultiplexerFocusTarget?,
   resolveMultiplexer: (MultiplexerKind) -> any MultiplexerFocus = multiplexer(for:)

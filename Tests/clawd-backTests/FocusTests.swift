@@ -2,19 +2,19 @@ import XCTest
 
 @testable import clawd_back
 
-private struct FakeBaseline: TerminalApp {
-  let kind: Terminal
+private struct FakeBaseline: AppActivation {
+  let kind: Application
   var isFrontmost: Bool
-  var bundleIdentifier: String { kind.bundleIdentifier }
+  var bundleIdentifier: String { kind.bundleIdentifier! }
 }
 
 private struct FakeWindowTerminal: WindowFocus {
-  let kind: Terminal
+  let kind: Application
   var isFrontmost: Bool
   var front: WindowFocusTarget?
   var steps: [String]
   var exists: Bool = true
-  var bundleIdentifier: String { kind.bundleIdentifier }
+  var bundleIdentifier: String { kind.bundleIdentifier! }
   func frontTarget() -> WindowFocusTarget? { front }
   func windowExists(_ window: String) -> Bool { exists }
   func focusSteps(for target: WindowFocusTarget) -> [String] { steps }
@@ -56,7 +56,7 @@ final class FocusPlanTests: XCTestCase {
       resolveMultiplexer: resolve(mux))
     XCTAssertEqual(
       plan.steps,
-      ["sleep 0.3", "FOCUS", "/usr/bin/open -b '\(Terminal.rio.bundleIdentifier)'"])
+      ["sleep 0.3", "FOCUS", "/usr/bin/open -b '\(Application.rio.bundleIdentifier!)'"])
   }
 
   func testMultiplexerBeforeWindowSoWindowRaiseIsLast() {

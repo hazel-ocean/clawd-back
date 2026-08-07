@@ -6,8 +6,8 @@ import Foundation
 // without it degrade to activation only. The scripts it runs live beside this
 // file as standalone .applescript files, bundled into Contents/Resources/Ghostty.
 struct Ghostty: WindowFocus {
-  let kind = Terminal.ghostty
-  var bundleIdentifier: String { kind.bundleIdentifier }
+  let kind = Application.ghostty
+  var bundleIdentifier: String { kind.bundleIdentifier! }
 
   func frontTarget() -> WindowFocusTarget? {
     guard

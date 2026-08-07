@@ -29,7 +29,7 @@ let title = (match $event {
   "Notification" => (if ($message | str trim | is-empty) { "Claude needs your input" } else { $message })
   "Stop" | _     => "Claude has finished and is waiting"
 })
-let body = (if ($last_said | str trim | is-empty) { "Click to go check on Clawd." } else { $last_said })
+let body = (if ($last_said | str trim | is-empty) { "Click to go check on Clawd" } else { $last_said })
 
 if ($app | path exists) {
   ^open $app --args notify --title $title --message $body --session-id $session_id

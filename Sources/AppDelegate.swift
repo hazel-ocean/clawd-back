@@ -41,7 +41,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
     }
 
     let state = FocusPayload.decode(response.notification.request.content.userInfo)
-    let term = terminalApp(for: loadConfiguredTerminal())
+    let term = loadConfiguredApp()
 
     switch resolveFocus(
       term: term, terminalTarget: state.terminal, multiplexerTarget: state.multiplexer)

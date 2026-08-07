@@ -23,7 +23,7 @@ private func randomCrabAttachment() -> UNNotificationAttachment? {
 // event can't overwrite a good capture with the wrong window.
 func captureAndSave(args: [String]) {
   guard let sessionId = parseArg(args, flag: "--session-id"), !sessionId.isEmpty else { return }
-  let term = terminalApp(for: loadConfiguredTerminal())
+  let term = loadConfiguredApp()
   guard term.isFrontmost else { return }
 
   let existing = StateStore.load(sessionId)
@@ -49,7 +49,7 @@ func sendNotification(args: [String]) async {
   let title = folder != nil ? "\(baseTitle) [\(folder!)]" : baseTitle
 
   let saved = parseArg(args, flag: "--session-id").flatMap { StateStore.load($0) }
-  let term = terminalApp(for: loadConfiguredTerminal())
+  let term = loadConfiguredApp()
 
   let terminalTarget = saved?.terminal
   // Prefer the capture; fall back to the live env for the multiplexer target

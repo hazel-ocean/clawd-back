@@ -17,6 +17,9 @@ let package = Package(
         "Ghostty/ghostty-front-target.applescript",
         "Ghostty/ghostty-focus.applescript",
         "Ghostty/ghostty-window-exists.applescript",
+        "Accessibility/ax-front-target.applescript",
+        "Accessibility/ax-focus.applescript",
+        "Accessibility/ax-window-exists.applescript",
       ]
     ),
     .testTarget(

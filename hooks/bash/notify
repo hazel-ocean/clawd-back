@@ -27,6 +27,6 @@ if [ -n "$transcript" ] && [ -f "$transcript" ] && command -v jq >/dev/null 2>&1
     | jq -rc 'select(.type=="assistant") | [.message.content[]? | select(.type=="text") | .text] | join(" ")' 2>/dev/null \
     | grep -v '^$' | tail -n 1 | tr '\n' ' ' | cut -c1-180 | sed 's/[[:space:]]*$//' || true)
 fi
-body=${said:-"Click to go check on Clawd."}
+body=${said:-"Click to go check on Clawd"}
 
 open "$app" --args notify --title "$title" --message "$body" --session-id "$sid"
