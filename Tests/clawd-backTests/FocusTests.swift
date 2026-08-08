@@ -2,6 +2,10 @@ import XCTest
 
 @testable import clawd_back
 
+// The leading steps every non-empty plan shares: block on this app's quit
+// (CLAWD_PID, set by runDetached), then a short settle. See `focusPlan`.
+private let waitForQuit = ["while kill -0 \"$CLAWD_PID\" 2>/dev/null; do sleep 0.02; done", "sleep 0.1"]
+
 private struct FakeBaseline: AppActivation {
   let kind: Application
   var isFrontmost: Bool
@@ -44,8 +48,8 @@ final class FocusPlanTests: XCTestCase {
       kind: .ghostty, isFrontmost: false, front: nil, steps: ["SELECT"])
     let plan = focusPlan(
       term: term, terminalTarget: winTarget, multiplexerTarget: nil)
-    // A window raise self-activates, so no open -b step.
-    XCTAssertEqual(plan.steps, ["sleep 0.3", "SELECT"])
+    // A window raise self-activates, so no open -b step; re-asserted once.
+    XCTAssertEqual(plan.steps, waitForQuit + ["SELECT", "sleep 0.15", "SELECT"])
   }
 
   func testMultiplexerOnlyPlanOnBaselineTerminal() {
@@ -56,7 +60,7 @@ final class FocusPlanTests: XCTestCase {
       resolveMultiplexer: resolve(mux))
     XCTAssertEqual(
       plan.steps,
-      ["sleep 0.3", "FOCUS", "/usr/bin/open -b '\(Application.rio.bundleIdentifier!)'"])
+      waitForQuit + ["FOCUS", "/usr/bin/open -b '\(Application.rio.bundleIdentifier!)'"])
   }
 
   func testMultiplexerBeforeWindowSoWindowRaiseIsLast() {
@@ -67,8 +71,8 @@ final class FocusPlanTests: XCTestCase {
       term: term, terminalTarget: winTarget, multiplexerTarget: muxTarget,
       resolveMultiplexer: resolve(mux))
     // Pane focus first (session state), window raise last (wins OS focus);
-    // the raise self-activates, so no open -b.
-    XCTAssertEqual(plan.steps, ["sleep 0.3", "FOCUS", "SELECT"])
+    // the raise self-activates, so no open -b, and is re-asserted once.
+    XCTAssertEqual(plan.steps, waitForQuit + ["FOCUS", "SELECT", "sleep 0.15", "SELECT"])
   }
 
   func testNothingToFocusIsEmpty() {
@@ -136,7 +140,7 @@ final class ResolveFocusTests: XCTestCase {
     let outcome = resolveFocus(
       term: term, terminalTarget: winTarget, multiplexerTarget: muxTarget,
       resolveMultiplexer: resolve(mux))
-    XCTAssertEqual(plan(outcome)?.steps, ["sleep 0.3", "FOCUS", "SELECT"])
+    XCTAssertEqual(plan(outcome)?.steps, waitForQuit + ["FOCUS", "SELECT", "sleep 0.15", "SELECT"])
   }
 
   func testBaselineNoMultiplexerResolvesToFocus() {

@@ -16,6 +16,12 @@ struct FocusPlan {
     let p = Process()
     p.executableURL = URL(fileURLWithPath: "/bin/sh")
     p.arguments = ["-c", steps.joined(separator: "; ")]
+    // Hand the child our pid via the environment (captured at spawn, so it's
+    // correct even if we exit immediately) so its first step can block until we
+    // are gone. $PPID would need the child to start before we die; this doesn't.
+    var env = ProcessInfo.processInfo.environment
+    env["CLAWD_PID"] = String(ProcessInfo.processInfo.processIdentifier)
+    p.environment = env
     try? p.run()  // detached: do not wait; this app terminates next.
   }
 }
@@ -62,9 +68,13 @@ func focusPlan(
   // notification can't clobber a correct focus from another one.
   guard hasTerminal || multiplexerTarget != nil else { return plan }
 
-  // Wait out this app's ~0.1s self-terminate so the focus lands after we've quit
-  // and the terminal has settled (otherwise our quit resets the tab).
-  plan.add("sleep 0.3")
+  // Wait out this app's self-terminate so the focus lands after we've quit and
+  // the terminal has settled (otherwise our quit resets the tab). A fixed sleep
+  // raced a variable quit latency; block on this app's own pid (CLAWD_PID, set
+  // by runDetached) so focus runs strictly after we're gone, then a short settle
+  // for the window server to finish reactivating the prior app.
+  plan.add("while kill -0 \"$CLAWD_PID\" 2>/dev/null; do sleep 0.02; done")
+  plan.add("sleep 0.1")
   if let target = multiplexerTarget {
     plan.add(resolveMultiplexer(target.kind).focusSteps(for: target))
   }
@@ -73,6 +83,11 @@ func focusPlan(
   // raise and steal focus back, e.g. to another display's window. Activate only
   // when no window raise will run (baseline terminals, or a mux-only target).
   if let wf = term as? WindowFocus, let target = terminalTarget {
+    plan.add(wf.focusSteps(for: target))
+    // Re-assert once: macOS reactivates the prior front app as we quit, which can
+    // steal the window back right after the first raise. `select tab` + `focus`
+    // are idempotent, so a second pass is a no-op when the first already won.
+    plan.add("sleep 0.15")
     plan.add(wf.focusSteps(for: target))
   } else {
     plan.add(term.activationStep())

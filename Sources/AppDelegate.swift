@@ -63,10 +63,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
   }
 
   private func terminateApp() {
-    // Quit promptly; the detached focus (spawned by clawBack) waits out this
-    // quit before touching the terminal.
-    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-      NSApplication.shared.terminate(nil)
-    }
+    // Quit immediately; the detached focus already holds our pid (CLAWD_PID) from
+    // its spawn environment and blocks on it, so it lands strictly after we exit.
+    // No pre-quit delay is needed to let the child capture the pid first.
+    NSApplication.shared.terminate(nil)
   }
 }
