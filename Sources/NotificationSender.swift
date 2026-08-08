@@ -46,6 +46,7 @@ func sendNotification(args: [String]) async {
   let baseTitle = parseArg(args, flag: "--title") ?? "Claude Code"
 
   let folder = parseArg(args, flag: "--folder")
+  let cwd = parseArg(args, flag: "--cwd")
   let title = folder != nil ? "\(baseTitle) [\(folder!)]" : baseTitle
 
   let saved = parseArg(args, flag: "--session-id").flatMap { StateStore.load($0) }
@@ -90,7 +91,7 @@ func sendNotification(args: [String]) async {
   content.interruptionLevel = .timeSensitive
   content.userInfo = FocusPayload.userInfo(
     terminal: terminalTarget, multiplexer: multiplexerTarget,
-    title: baseTitle, message: message, folder: folder)
+    title: baseTitle, message: message, folder: folder, cwd: cwd)
   if let crab = randomCrabAttachment() {
     content.attachments = [crab]
   }

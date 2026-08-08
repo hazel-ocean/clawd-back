@@ -102,7 +102,7 @@ enum FocusPayload {
   // this userInfo, can rebuild the locator notification without the state store.
   static func userInfo(
     terminal: WindowFocusTarget?, multiplexer: MultiplexerFocusTarget?,
-    title: String, message: String, folder: String?
+    title: String, message: String, folder: String?, cwd: String?
   ) -> [String: Any] {
     [
       "terminal_target": encodeJSON(terminal),
@@ -110,18 +110,21 @@ enum FocusPayload {
       "title": title,
       "message": message,
       "folder": folder ?? "",
+      "cwd": cwd ?? "",
     ]
   }
 
   static func decode(_ userInfo: [AnyHashable: Any]) -> FocusState {
     let folder = userInfo["folder"] as? String
+    let cwd = userInfo["cwd"] as? String
     return FocusState(
       terminal: decodeJSON(WindowFocusTarget.self, from: userInfo["terminal_target"] as? String),
       multiplexer: decodeJSON(
         MultiplexerFocusTarget.self, from: userInfo["multiplexer_target"] as? String),
       title: userInfo["title"] as? String ?? "Claude Code",
       message: userInfo["message"] as? String ?? "",
-      folder: (folder?.isEmpty ?? true) ? nil : folder)
+      folder: (folder?.isEmpty ?? true) ? nil : folder,
+      cwd: (cwd?.isEmpty ?? true) ? nil : cwd)
   }
 }
 

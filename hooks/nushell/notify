@@ -6,6 +6,7 @@ let event = ($input.hook_event_name? | default "")
 let message = ($input.message? | default "")
 let session_id = ($input.session_id? | default "")
 let transcript = ($input.transcript_path? | default "")
+let cwd = ($input.cwd? | default ($env.PWD? | default ""))
 let app = ($env.HOME | path join "Applications" "ClawdBack.app")
 
 # Claude's last text message, from the tail of the transcript (the final
@@ -32,5 +33,5 @@ let title = (match $event {
 let body = (if ($last_said | str trim | is-empty) { "Click to go check on Clawd" } else { $last_said })
 
 if ($app | path exists) {
-  ^open $app --args notify --title $title --message $body --session-id $session_id
+  ^open $app --args notify --title $title --message $body --session-id $session_id --cwd $cwd
 }

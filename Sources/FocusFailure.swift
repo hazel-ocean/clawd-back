@@ -20,6 +20,7 @@ struct FocusState: Equatable {
   var title: String
   var message: String
   var folder: String?
+  var cwd: String? = nil
 }
 
 // Configurable reaction to a FocusFailure, decoded from config like Application.
@@ -66,19 +67,29 @@ func handleFocusFailure(
 // is instead of doing nothing.
 func locatorContent(_ failure: FocusFailure, state: FocusState) -> (title: String, body: String) {
   let suffix = state.folder.map { " [\($0)]" } ?? ""
+  // The working directory is the durable locator: still valid whatever became of
+  // the window or session, so append it whenever we captured it.
+  let location = state.cwd.map { "\nLast in: \($0)" } ?? ""
   if let mux = state.multiplexer {
     switch failure {
     case .sessionDetached:
       return (
         "Session detached\(suffix)",
-        "\(state.message)\n\(mux.kind.rawValue) session \(mux.session) is detached - run: \(mux.kind.rawValue) attach \(mux.session)"
+        "\(state.message)\n\(mux.kind.rawValue) session \(mux.session) is detached - run: \(mux.kind.rawValue) attach \(mux.session)\(location)"
       )
     case .windowGone:
+      // The window/tab ids are stale now, but the session is still attached
+      // somewhere; name it so a reattach lands the user back on the pane.
       return (
         "Window closed\(suffix)",
-        "\(state.message)\nSession \(mux.session) is elsewhere - run: \(mux.kind.rawValue) attach \(mux.session)"
+        "\(state.message)\n\(mux.kind.rawValue) session \(mux.session) is attached elsewhere - run: \(mux.kind.rawValue) attach \(mux.session)\(location)"
       )
     }
+  }
+  // No multiplexer and the window is gone: the cwd is all that survives, so lead
+  // with it rather than the old dead-end sentence.
+  if state.cwd != nil {
+    return ("Window closed\(suffix)", "\(state.message)\nTerminal window closed.\(location)")
   }
   return ("Window closed\(suffix)", "\(state.message)\nIts terminal window is no longer open.")
 }

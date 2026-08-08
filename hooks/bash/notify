@@ -11,6 +11,7 @@ sid=$(get session_id)
 event=$(get hook_event_name)
 message=$(get message)
 transcript=$(get transcript_path)
+cwd=$(get cwd); cwd=${cwd:-$PWD}
 
 # Title states the reason: the specific Notification message, or the finished
 # state on Stop.
@@ -29,4 +30,4 @@ if [ -n "$transcript" ] && [ -f "$transcript" ] && command -v jq >/dev/null 2>&1
 fi
 body=${said:-"Click to go check on Clawd"}
 
-open "$app" --args notify --title "$title" --message "$body" --session-id "$sid"
+open "$app" --args notify --title "$title" --message "$body" --session-id "$sid" --cwd "$cwd"

@@ -155,21 +155,24 @@ final class FocusPayloadTests: XCTestCase {
   private let winTarget = WindowFocusTarget(window: "w1", tab: "t1")
   private let muxTarget = MultiplexerFocusTarget(kind: .zellij, session: "main", pane: "3")
 
-  func testRoundTripsMessageAndFolder() {
+  func testRoundTripsMessageFolderAndCwd() {
     let info = FocusPayload.userInfo(
       terminal: winTarget, multiplexer: muxTarget,
-      title: "Claude Code", message: "needs you", folder: "myrepo")
+      title: "Claude Code", message: "needs you", folder: "myrepo", cwd: "/repos/myrepo")
     let state = FocusPayload.decode(info)
     XCTAssertEqual(state.terminal, winTarget)
     XCTAssertEqual(state.multiplexer, muxTarget)
     XCTAssertEqual(state.message, "needs you")
     XCTAssertEqual(state.folder, "myrepo")
+    XCTAssertEqual(state.cwd, "/repos/myrepo")
   }
 
-  func testEmptyFolderDecodesNil() {
+  func testEmptyFolderAndCwdDecodeNil() {
     let info = FocusPayload.userInfo(
-      terminal: nil, multiplexer: nil, title: "T", message: "m", folder: nil)
-    XCTAssertNil(FocusPayload.decode(info).folder)
+      terminal: nil, multiplexer: nil, title: "T", message: "m", folder: nil, cwd: nil)
+    let state = FocusPayload.decode(info)
+    XCTAssertNil(state.folder)
+    XCTAssertNil(state.cwd)
   }
 }
 
@@ -183,6 +186,44 @@ final class LocatorContentTests: XCTestCase {
     let (title, body) = locatorContent(.sessionDetached, state: state)
     XCTAssertTrue(title.contains("myrepo"))
     XCTAssertTrue(body.contains("zellij attach main"))
+  }
+
+  func testDetachedIncludesCwdWhenKnown() {
+    let state = FocusState(
+      terminal: nil, multiplexer: muxTarget,
+      title: "Claude Code", message: "needs you", folder: nil, cwd: "/repos/myrepo")
+    let (_, body) = locatorContent(.sessionDetached, state: state)
+    XCTAssertTrue(body.contains("zellij attach main"))
+    XCTAssertTrue(body.contains("/repos/myrepo"))
+  }
+
+  func testWindowGoneWithMuxNamesSessionNotStaleWindow() {
+    let term = WindowFocusTarget(window: "w1", tab: "t1")
+    let state = FocusState(
+      terminal: term, multiplexer: muxTarget,
+      title: "Claude Code", message: "needs you", folder: nil, cwd: nil)
+    let (title, body) = locatorContent(.windowGone, state: state)
+    XCTAssertTrue(title.contains("Window closed"))
+    XCTAssertTrue(body.contains("zellij attach main"))
+    XCTAssertFalse(body.contains("w1"))
+    XCTAssertFalse(body.contains("t1"))
+  }
+
+  func testWindowGoneNoMuxNamesCwd() {
+    let state = FocusState(
+      terminal: WindowFocusTarget(window: "w1", tab: "t1"), multiplexer: nil,
+      title: "Claude Code", message: "needs you", folder: nil, cwd: "/repos/myrepo")
+    let (_, body) = locatorContent(.windowGone, state: state)
+    XCTAssertTrue(body.contains("/repos/myrepo"))
+    XCTAssertFalse(body.contains("w1"))
+  }
+
+  func testWindowGoneNoMuxNoCwdFallsBack() {
+    let state = FocusState(
+      terminal: nil, multiplexer: nil,
+      title: "Claude Code", message: "needs you", folder: nil, cwd: nil)
+    let (_, body) = locatorContent(.windowGone, state: state)
+    XCTAssertTrue(body.contains("no longer open"))
   }
 }
 
