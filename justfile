@@ -60,7 +60,7 @@ uninstall:
 
 test-notify: install
     @echo "Sending test notification..."
-    open {{install_dir}}/{{bundle_name}} --args notify --message "Test notification from Clawd Back" --title "Test"
+    env -u ZELLIJ_SESSION_NAME -u ZELLIJ_PANE_ID open {{install_dir}}/{{bundle_name}} --args notify --message "Test notification from Clawd Back" --title "Test"
 
 # List available code signing identities.
 list-identities:
