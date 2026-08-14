@@ -105,9 +105,13 @@ Use whatever path the app actually lives at, `~/Applications/...` if you install
 
 Prefer your own copies, or a shell that isn't shipped? The same wrappers live under [`hooks/`](hooks/), one directory per shell: [`hooks/bash/`](hooks/bash/) and [`hooks/nushell/`](hooks/nushell/). Copy a set to `~/.claude/hooks/` and point the commands there instead.
 
-The banner title states the reason: on a `Notification` it's the specific message (which tool needs permission, or idle); on `Stop` it's `Claude has finished and is waiting`. The body always carries Claude's last message, pulled from the transcript tail, as color. The Nushell `notify` parses the transcript natively; the bash one needs `jq` for it and otherwise falls back to a generic nudge.
+The banner title states the reason: on a `Notification` it's the specific message (which tool needs permission, or idle); on `Stop` it's `Claude has finished and is waiting`. Inside Zellij it's led by the session name, `[my-project] Claude has finished and is waiting`, so a glance tells you which workspace wants you. The body always carries Claude's last message, pulled from the transcript tail, as color. The Nushell `notify` parses the transcript natively; the bash one needs `jq` for it and otherwise falls back to a generic nudge.
 
 Because `open` propagates the caller's environment, `ZELLIJ_SESSION_NAME` / `ZELLIJ_PANE_ID` reach the app when the hook runs inside a Zellij pane.
+
+### Customizing the notification
+
+`--title` and `--message` are the wrapper's to compute however you like: from the hook payload, the transcript, the environment. `--session-id` and `--cwd` are what the app needs to skip-when-viewing and claw you back, so keep passing them through. Copy a wrapper to `~/.claude/hooks/`, edit it, and point the hook commands there.
 
 ## Configuration
 

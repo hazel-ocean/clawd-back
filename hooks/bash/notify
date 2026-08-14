@@ -20,6 +20,12 @@ case "$event" in
   *)            title="Claude has finished and is waiting" ;;
 esac
 
+# Lead with the zellij session name when present, so a glance tells you which
+# workspace wants you.
+if [ -n "${ZELLIJ_SESSION_NAME:-}" ]; then
+  title="[$ZELLIJ_SESSION_NAME] $title"
+fi
+
 # Body always carries Claude's last transcript text as color. The scan needs jq;
 # without it the body is a nudge.
 said=""
