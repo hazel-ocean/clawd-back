@@ -1,6 +1,6 @@
 cask "clawd-back" do
-  version "2.3.1"
-  sha256 "e51134263f087ca494aaf37db394bd303f506ee5624bb98641aa3e078af46b6d"
+  version "2.3.2"
+  sha256 "e995026152e6ab448d3edc2b8c714c86d2bb9d73c5b465a0ecde95eb54c7fc86"
 
   url "https://github.com/hazel-ocean/clawd-back/releases/download/v#{version}/ClawdBack-#{version}-aarch64-darwin.zip"
   name "Clawd Back"
