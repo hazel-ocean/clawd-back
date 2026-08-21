@@ -168,19 +168,27 @@ Targeting is by the saved OS window id captured at `SessionStart`, so it is exac
 Sources/
   main.swift               # mode dispatch: capture | notify | cleanup | click handler
   AppDelegate.swift        # notification click handling
-  NotificationSender.swift # capture + send, skip-when-viewing, crab attachment
-  TerminalController.swift # per-terminal window/tab capture + focus
+  NotificationSender.swift # capture + send, crab attachment
+  Dismissal.swift          # notification keying + removal once you are back
+  Focus.swift              # focus plans, skip-when-viewing, click payload
+  FocusFailure.swift       # unreachable target: locator notification
+  Application.swift        # app protocols, window/tab targets, app selection
+  Ghostty/                 # window/tab capture + focus via its AppleScript dictionary
+  Accessibility/           # same, by window title via System Events (`generic`)
+  Multiplexer.swift        # zellij: pane target, focus, attach/focus probes
   StateStore.swift         # ~/.cache/clawd-back/<id>.json
   Config.swift             # app-selection config (TOML/JSON)
-  ZellijContext.swift      # zellij binary discovery
-  FocusManager.swift       # zellij focus-pane-id
+  Shell.swift              # process + quoting helpers
 Resources/
   Info.plist               # LSUIElement bundle, id com.hazel.clawd-back
   AppIcon.icns             # app icon
+  AlternateAppIcons/       # icon variants
   Crabs/                   # crab images, one at random per notification
 hooks/                     # hook wrappers, one dir per shell (both bundled into the app)
   bash/                    # capture | notify | cleanup
   nushell/                 # same wrappers, Nushell
+Tests/
+  clawd-backTests/         # pure units: plans, payloads, state, identifiers
 ```
 
 ## License
