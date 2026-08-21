@@ -6,8 +6,12 @@ import Foundation
 struct SessionState: Codable, Equatable {
   var terminal: WindowFocusTarget?
   var multiplexer: MultiplexerFocusTarget?
+  // Set while this session has a delivered notification, so `capture` only
+  // pays the notification-server round trip when there is one to dismiss.
+  // Optional so a file written before this field still decodes.
+  var notified: Bool?
 
-  var isEmpty: Bool { terminal == nil && multiplexer == nil }
+  var isEmpty: Bool { terminal == nil && multiplexer == nil && notified != true }
 }
 
 // The pre-protocol flat schema, kept only so a session already in flight at

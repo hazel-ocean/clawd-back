@@ -13,6 +13,7 @@ It also stays quiet when you are already looking at that session, so you only ge
 - **Notifies** via `UNUserNotificationCenter` on Claude's `Stop` and `Notification` hooks.
 - **Remembers where the session lives.** On `SessionStart` and every `UserPromptSubmit` (when the terminal is reliably frontmost) it records the OS window id + tab id, plus the Zellij session/pane when present, keyed by Claude session id. Re-capturing per prompt keeps targeting correct after you reattach a Zellij session in a different window.
 - **Skips the banner** when the front window is already that session's window (and, in Zellij, its pane).
+- **Clears the banner when you come back.** Each session has one live notification, so a new one replaces that session's stale banner instead of stacking. It is removed as soon as you are seen at the session's window/pane: on that session's next prompt, or when any other session notifies while you are looking at it.
 - **Clicks back.** Clicking a notification raises the saved window, selects its tab, brings the app to the front (even from another app), and in Zellij runs `action focus-pane-id`.
 - **Tells you when it can't.** If the session moved out of reach since capture (its Zellij session detached, or the window was closed), a click can't land, so instead of doing nothing it posts a second notification saying where the session is (e.g. `zellij attach <session>`).
 - **Cleans up** the saved state on `SessionEnd`.
@@ -143,10 +144,13 @@ is reported as closed rather than raised.
 SessionStart   -->  open ClawdBack.app --args capture --session-id <id>
 UserPromptSubmit    saves window_id + tab_id (+ zellij session/pane)
                     to ~/.cache/clawd-back/<id>.json (only when frontmost)
+                    removes this session's delivered notification
 
 Stop / Notify  -->  open ClawdBack.app --args notify --session-id <id> ...
+                    removes the notifications of every window/pane you view now
                     already viewing that window? -> skip
-                    else show notification (locator in userInfo, random crab)
+                    else show notification, keyed session:<id>
+                    (locator in userInfo, random crab)
 
 click          -->  open -b <terminal>   (bring to front, cross-app)
                     select saved window + tab

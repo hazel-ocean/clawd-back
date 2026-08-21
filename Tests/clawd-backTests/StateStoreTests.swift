@@ -72,6 +72,21 @@ final class StateStoreTests: XCTestCase {
     XCTAssertEqual(StateStore.load(sessionId), state)
   }
 
+  func testNotifiedFlagRoundTripsWithoutTargets() {
+    let sessionId = "clawd-test-\(UUID().uuidString)"
+    defer { StateStore.clear(sessionId) }
+    var state = SessionState(terminal: nil, multiplexer: nil)
+    state.notified = true
+    StateStore.save(state, sessionId: sessionId)
+    XCTAssertEqual(StateStore.load(sessionId)?.notified, true)
+  }
+
+  func testStateWithoutNotifiedFieldDecodes() {
+    let decoded = decode(#"{"terminal":{"window":"w1","tab":"t1"}}"#)
+    XCTAssertEqual(decoded?.terminal, WindowFocusTarget(window: "w1", tab: "t1"))
+    XCTAssertNil(decoded?.notified)
+  }
+
   func testEmptyStateIsNotWritten() {
     let sessionId = "clawd-test-\(UUID().uuidString)"
     defer { StateStore.clear(sessionId) }

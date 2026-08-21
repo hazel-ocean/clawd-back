@@ -21,10 +21,14 @@ private func randomCrabAttachment() -> UNNotificationAttachment? {
 // Claude session id, so later notify/click resolve the exact window. Only runs
 // when the terminal is frontmost (which it is at these events), so a background
 // event can't overwrite a good capture with the wrong window.
-func captureAndSave(args: [String]) {
-  guard let sessionId = parseArg(args, flag: "--session-id"), !sessionId.isEmpty else { return }
+// Returns true when a dismissal was issued, so the caller can stay alive for it.
+@discardableResult
+func captureAndSave(args: [String]) -> Bool {
+  guard let sessionId = parseArg(args, flag: "--session-id"), !sessionId.isEmpty else {
+    return false
+  }
   let term = loadConfiguredApp()
-  guard term.isFrontmost else { return }
+  guard term.isFrontmost else { return false }
 
   let existing = StateStore.load(sessionId)
   // Never clobber a good target with a transient capture miss: keep the prior
@@ -36,9 +40,20 @@ func captureAndSave(args: [String]) {
     existing?.multiplexer
     ?? captureMultiplexerTarget(env: ProcessInfo.processInfo.environment)
 
-  StateStore.save(
-    SessionState(terminal: terminalTarget, multiplexer: multiplexerTarget),
-    sessionId: sessionId)
+  // Both events fire from Claude's pane while the terminal is frontmost, so the
+  // user is back and any banner this session left behind is stale.
+  let dismissed = existing?.notified == true
+  if dismissed { dismissNotification(sessionId: sessionId) }
+
+  let state = SessionState(terminal: terminalTarget, multiplexer: multiplexerTarget)
+  // An all-empty state is never written, so clear the file instead: leaving a
+  // stale `notified` behind would re-arm the dismissal on every prompt.
+  if state.isEmpty {
+    StateStore.clear(sessionId)
+  } else {
+    StateStore.save(state, sessionId: sessionId)
+  }
+  return dismissed
 }
 
 func sendNotification(args: [String]) async {
@@ -49,8 +64,13 @@ func sendNotification(args: [String]) async {
   let cwd = parseArg(args, flag: "--cwd")
   let title = folder != nil ? "\(baseTitle) [\(folder!)]" : baseTitle
 
-  let saved = parseArg(args, flag: "--session-id").flatMap { StateStore.load($0) }
+  let sessionId = parseArg(args, flag: "--session-id")
+  let saved = sessionId.flatMap { StateStore.load($0) }
   let term = loadConfiguredApp()
+
+  // Any pane the user walked over to since its notification arrived is stale,
+  // including this session's own when the skip below applies.
+  await dismissViewedNotifications(term: term)
 
   let terminalTarget = saved?.terminal
   // Prefer the capture; fall back to the live env for the multiplexer target
@@ -97,13 +117,19 @@ func sendNotification(args: [String]) async {
   }
 
   let request = UNNotificationRequest(
-    identifier: UUID().uuidString,
+    identifier: notificationIdentifier(sessionId: sessionId),
     content: content,
     trigger: nil
   )
 
   do {
     try await center.add(request)
+    if let sessionId, !sessionId.isEmpty {
+      var state =
+        saved ?? SessionState(terminal: terminalTarget, multiplexer: multiplexerTarget)
+      state.notified = true
+      StateStore.save(state, sessionId: sessionId)
+    }
   } catch {
     print("Failed to send notification: \(error)")
   }
