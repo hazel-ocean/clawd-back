@@ -1,7 +1,6 @@
 # Plan: Configuration schema and settings window
 
 Status: proposed
-Consolidates the former "Configuration UI" and "Configuration points" roadmap sections into one effort.
 
 ## Motivation
 
@@ -75,11 +74,25 @@ SwiftUI settings form (macOS 13+, already the floor). One `Form` mapping the set
 
 ## Settings inventory
 
-The consolidated table lives in `ROADMAP.md`. Implementation status per row:
+Each row names the current default, so the UI has something to diff against. All but Application are hard-coded today; Application is already file-configurable (`loadConfiguredApp()`), so the UI would only surface it.
+
+| Setting | Current default | Options |
+| --- | --- | --- |
+| Application | `ghostty` (already file-configurable) | ghostty \| wezterm \| iterm2 \| terminal \| alacritty \| kitty \| rio \| generic (shipped) |
+| Focus-failure response (unreachable click) | notify (locate the session) | notify \| spawn a fresh surface \| switch captured window's session |
+| New-surface placement | fullscreen -> new tab, else new window | smart (that rule, default) \| always a new window \| always a new tab |
+| Skip-when-viewing | on | on \| off |
+| Notification interruption level | `timeSensitive` | passive \| active \| timeSensitive \| critical |
+| Crab image | random per notification | random \| off (app icon) \| fixed image |
+| `zellij attach` when session is gone | plain `attach` (errors visibly) | `attach` \| `attach --create` (empty session) |
+| Focus-settle timings | `sleep 0.3` focus delay; attach-settle delay before pane focus | advanced / tunable |
+| Multiplexer | zellij | zellij (tmux is a future conformer) |
+
+Implementation status per row:
 
 - Implemented today, wire immediately: Terminal, Skip-when-viewing, Notification interruption level, Crab image, `zellij attach` mode, Focus-settle timings.
 - Behavior implemented (hard-coded) by `reuse-or-spawn-claw-back.md`, surface here once it lands: Detached-session strategy, New-surface placement.
-- Schema placeholder until the feature exists: Multiplexer (zellij only until a tmux conformer exists, see the Multiplexer support roadmap section).
+- Schema placeholder until the feature exists: Multiplexer (zellij only until a second `MultiplexerFocus` conformer exists).
 
 ## Phasing
 

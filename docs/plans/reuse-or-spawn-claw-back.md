@@ -8,7 +8,7 @@ ClawdBack notifies you when a Claude Code session needs attention and, on click,
 
 Model a claw-back as something that *resolves* to either runnable focus steps or a **typed failure with a reason**, and hand the failure to a **configurable response**. Never a silent no-op. The first, least-destructive response is `.notify`: after a click that can't land, post a second notification that says why and where the session is, so you can get there yourself. It moves nothing, evicts nothing, spawns nothing.
 
-More aggressive responses (spawn a fresh surface, add a tab, switch an occupied window's session in place) are real options but they all disturb your existing workspace to some degree, so they are deferred to the configuration effort as opt-in strategies. See [docs/plans/configuration.md](configuration.md) (Detached-session strategy / New-surface placement) and `ROADMAP.md`. The default stays non-destructive: tell the user, don't rearrange their windows.
+More aggressive responses (spawn a fresh surface, add a tab, switch an occupied window's session in place) are real options but they all disturb your existing workspace to some degree, so they are deferred to the configuration effort as opt-in strategies. See [docs/plans/configuration.md](configuration.md) (Detached-session strategy / New-surface placement). The default stays non-destructive: tell the user, don't rearrange their windows.
 
 ## Model
 
