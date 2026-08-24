@@ -11,11 +11,11 @@ It also stays quiet when you are already looking at that session, so you only ge
 ## What it does
 
 - **Notifies** via `UNUserNotificationCenter` on Claude's `Stop` and `Notification` hooks.
-- **Remembers where the session lives.** On `SessionStart` and every `UserPromptSubmit` (when the terminal is reliably frontmost) it records the OS window id + tab id, plus the Zellij session/pane when present, keyed by Claude session id. Re-capturing per prompt keeps targeting correct after you reattach a Zellij session in a different window.
+- **Remembers where the session lives.** On `SessionStart` and every `UserPromptSubmit` it records the OS window id + tab id, plus the Zellij session/pane when present, keyed by Claude session id. Each prompt re-derives the record: it re-reads what it can and drops any target that no longer resolves, so targeting stays correct after you reattach a Zellij session in a different window.
 - **Skips the banner** when the front window is already that session's window (and, in Zellij, its pane).
 - **Clears the banner when you come back.** Each session has one live notification, so a new one replaces that session's stale banner instead of stacking. It is removed as soon as you are seen at the session's window/pane: on that session's next prompt, or when any other session notifies while you are looking at it.
 - **Clicks back.** Clicking a notification raises the saved window, selects its tab, brings the app to the front (even from another app), and in Zellij runs `action focus-pane-id`.
-- **Tells you when it can't.** If the session moved out of reach since capture (its Zellij session detached, or the window was closed), a click can't land, so instead of doing nothing it posts a second notification saying where the session is (e.g. `zellij attach <session>`).
+- **Tells you when it can't.** If the session moved out of reach since capture, a click can't land, so instead of doing nothing it posts a second notification naming the reason: the window is closed, the Zellij session is detached (with the `zellij attach` command to run), or the session is gone and was possibly renamed. That notification replaces the session's banner, so it clears the same way.
 - **Cleans up** the saved state on `SessionEnd`.
 - **Crabs.** Each notification shows a random Claude Crab as its image.
 
@@ -68,7 +68,9 @@ The app has three modes, each driven by a Claude Code hook:
 | `notify`  | `Stop`, `Notification`           | Ping you (and stash the locator to claw you back).       |
 | `cleanup` | `SessionEnd`                     | Delete this session's saved state.                       |
 
-`capture` runs on **both** `SessionStart` (initial/attach) and `UserPromptSubmit` (every turn). The per-turn re-capture keeps targeting correct after you reattach a Zellij session in a *different* terminal window: the process never restarts so `SessionStart` never re-fires, but the next prompt refreshes the saved window/tab. It only writes when the terminal is frontmost, which both events guarantee.
+`capture` runs on **both** `SessionStart` (initial/attach) and `UserPromptSubmit` (every turn). The per-turn re-capture keeps targeting correct after you reattach a Zellij session in a *different* terminal window: the process never restarts so `SessionStart` never re-fires, but the next prompt refreshes the saved window/tab.
+
+A front-window read is trusted when the terminal is frontmost, or when Zellij confirms the pane is focused, which holds while another app sits in front. Failing both, the saved window is kept only while it is still open: a window id that no longer resolves is dropped, because it makes a click give up where no window id at all still focuses the pane. The same rule drops a Zellij session that is no longer in `list-sessions`.
 
 Claude Code delivers the hook payload (including `session_id`) as **JSON on stdin**, so each mode is fronted by a tiny wrapper that reads stdin and calls the app. **Ready-made wrappers ship inside the app bundle**, one directory per shell, at `/Applications/ClawdBack.app/Contents/Resources/hooks/<shell>/{capture,notify,cleanup}`, so point your hooks straight at them, no copy-paste.
 
@@ -143,7 +145,7 @@ is reported as closed rather than raised.
 ```
 SessionStart   -->  open ClawdBack.app --args capture --session-id <id>
 UserPromptSubmit    saves window_id + tab_id (+ zellij session/pane)
-                    to ~/.cache/clawd-back/<id>.json (only when frontmost)
+                    to ~/.cache/clawd-back/<id>.json (dropping dead targets)
                     removes this session's delivered notification
 
 Stop / Notify  -->  open ClawdBack.app --args notify --session-id <id> ...
