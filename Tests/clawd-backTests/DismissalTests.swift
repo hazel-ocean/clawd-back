@@ -22,3 +22,25 @@ final class NotificationIdentifierTests: XCTestCase {
     XCTAssertNotEqual(a, notificationIdentifier(sessionId: ""))
   }
 }
+
+final class LocatorIdentityTests: XCTestCase {
+  // A locator replaces the banner that was clicked, so the click path has to
+  // rebuild that banner's identifier from the payload alone.
+  func testPayloadRebuildsTheBannerIdentifier() {
+    let info = FocusPayload.userInfo(
+      terminal: nil, multiplexer: nil, title: "Claude Code", message: "m", folder: nil,
+      cwd: nil, sessionId: "abc-123")
+    let state = FocusPayload.decode(info)
+    XCTAssertEqual(
+      notificationIdentifier(sessionId: state.sessionId),
+      notificationIdentifier(sessionId: "abc-123"))
+  }
+
+  func testMissingSessionIdStillYieldsAnIdentifier() {
+    let info = FocusPayload.userInfo(
+      terminal: nil, multiplexer: nil, title: "Claude Code", message: "m", folder: nil,
+      cwd: nil, sessionId: nil)
+    let state = FocusPayload.decode(info)
+    XCTAssertFalse(notificationIdentifier(sessionId: state.sessionId).hasPrefix("session:"))
+  }
+}

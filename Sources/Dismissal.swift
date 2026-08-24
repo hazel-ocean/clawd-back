@@ -17,8 +17,8 @@ func dismissNotification(sessionId: String) {
 
 // Clear the banner of every session whose window/pane the user is now looking
 // at. Each delivered notification carries its targets in userInfo, so the
-// delivered list is the whole work queue and needs no extra state. A locator
-// notification carries no targets, so `isViewing` never confirms it.
+// delivered list is the whole work queue and needs no extra state. Locator
+// notifications carry the same payload, so they clear the same way.
 func dismissViewedNotifications(term: any AppActivation) async {
   // Nothing is viewed while the terminal is in the background, so the
   // per-notification probes never run in that case.

@@ -5,6 +5,7 @@ import UserNotifications
 enum FocusFailure: Equatable {
   case windowGone
   case sessionDetached
+  case sessionMissing
 }
 
 // A resolved claw-back is one or the other, never a silent no-op.
@@ -21,6 +22,9 @@ struct FocusState: Equatable {
   var message: String
   var folder: String?
   var cwd: String? = nil
+  // Keys the locator notification to the same banner it replaces, so the next
+  // prompt can dismiss it.
+  var sessionId: String? = nil
 }
 
 // Configurable reaction to a FocusFailure, decoded from config like Application.
@@ -30,18 +34,25 @@ enum FocusFailureResponse: String, Codable, CaseIterable {
   case notify
 }
 
-// A detached session is the more actionable failure (we can name the reattach),
-// so it wins over a gone window. A reachable target yields today's focus plan.
+// A session failure is the more actionable one (we can name the session), so it
+// wins over a gone window. A reachable target yields today's focus plan.
 func resolveFocus(
   term: any AppActivation,
   terminalTarget: WindowFocusTarget?,
   multiplexerTarget: MultiplexerFocusTarget?,
   resolveMultiplexer: (MultiplexerKind) -> any MultiplexerFocus = multiplexer(for:)
 ) -> FocusOutcome {
-  if let mux = multiplexerTarget,
-    !resolveMultiplexer(mux.kind).isAttached(on: mux)
-  {
-    return .failure(.sessionDetached)
+  if let mux = multiplexerTarget {
+    switch resolveMultiplexer(mux.kind).sessionState(on: mux) {
+    case .missing:
+      return .failure(.sessionMissing)
+    // Unreachable reads as detached: the attach hint is the useful thing to say
+    // either way.
+    case .detached, .unreachable:
+      return .failure(.sessionDetached)
+    case .attached:
+      break
+    }
   }
   if let wf = term as? WindowFocus, let target = terminalTarget,
     !wf.windowExists(target.window)
@@ -66,32 +77,53 @@ func handleFocusFailure(
 // The second notification: a click couldn't reach the session, so say where it
 // is instead of doing nothing.
 func locatorContent(_ failure: FocusFailure, state: FocusState) -> (title: String, body: String) {
-  let suffix = state.folder.map { " [\($0)]" } ?? ""
-  // The working directory is the durable locator: still valid whatever became of
-  // the window or session, so append it whenever we captured it.
-  let location = state.cwd.map { "\nLast in: \($0)" } ?? ""
+  // The session name identifies the workspace on its own, so the folder label is
+  // only the fallback when there is no session to name.
+  let label = state.multiplexer?.session ?? state.folder
+  let title = label.map { "[\($0)] - \(issueLabel(failure))" } ?? issueLabel(failure)
+
+  var lines: [String] = []
   if let mux = state.multiplexer {
+    let kind = mux.kind.rawValue
     switch failure {
-    case .sessionDetached:
-      return (
-        "Session detached\(suffix)",
-        "\(state.message)\n\(mux.kind.rawValue) session \(mux.session) is detached - run: \(mux.kind.rawValue) attach \(mux.session)\(location)"
-      )
     case .windowGone:
       // The window/tab ids are stale now, but the session is still attached
-      // somewhere; name it so a reattach lands the user back on the pane.
-      return (
-        "Window closed\(suffix)",
-        "\(state.message)\n\(mux.kind.rawValue) session \(mux.session) is attached elsewhere - run: \(mux.kind.rawValue) attach \(mux.session)\(location)"
-      )
+      // somewhere, so the user can get back to it.
+      lines.append("The \(kind) session is attached elsewhere.")
+    case .sessionDetached:
+      lines.append("The \(kind) session is detached.")
+      // Quoted, because session names hold spaces and this line is meant to be
+      // copy-pasted.
+      lines.append("Attach: \(kind) attach \(shq(mux.session))")
+    case .sessionMissing:
+      lines.append("The \(kind) session is gone, possibly renamed.")
     }
+  } else {
+    lines.append("The terminal window is closed.")
   }
-  // No multiplexer and the window is gone: the cwd is all that survives, so lead
-  // with it rather than the old dead-end sentence.
-  if state.cwd != nil {
-    return ("Window closed\(suffix)", "\(state.message)\nTerminal window closed.\(location)")
+  // The working directory is the durable locator: still valid whatever became of
+  // the window or session.
+  if let cwd = state.cwd { lines.append("Last in: \(bannerPath(cwd))") }
+  return (title, lines.joined(separator: "\n"))
+}
+
+private func issueLabel(_ failure: FocusFailure) -> String {
+  switch failure {
+  case .windowGone: return "Window closed"
+  case .sessionDetached: return "Session detached"
+  case .sessionMissing: return "Session not found"
   }
-  return ("Window closed\(suffix)", "\(state.message)\nIts terminal window is no longer open.")
+}
+
+// A path a notification banner can show whole: home as `~`, and no more than the
+// last three components, since the banner truncates a long path mid-word.
+func bannerPath(_ path: String) -> String {
+  let home = FileManager.default.homeDirectoryForCurrentUser.path
+  let rooted = path.hasPrefix(home + "/") ? "~/" + path.dropFirst(home.count + 1) : path
+  let parts = rooted.split(separator: "/").map(String.init)
+  guard parts.count > 4 else { return rooted }
+  let tail = parts.suffix(3).joined(separator: "/")
+  return rooted.hasPrefix("/") ? "/…/" + tail : "\(parts[0])/…/" + tail
 }
 
 private func sendLocatorNotification(_ failure: FocusFailure, state: FocusState) async {
@@ -101,7 +133,14 @@ private func sendLocatorNotification(_ failure: FocusFailure, state: FocusState)
   content.body = body
   content.sound = .default
   content.interruptionLevel = .timeSensitive
+  // Same identity and payload as the banner this replaces: one live notification
+  // per session, dismissible by the next prompt and by skip-when-viewing.
+  content.userInfo = FocusPayload.userInfo(
+    terminal: state.terminal, multiplexer: state.multiplexer,
+    title: state.title, message: state.message, folder: state.folder, cwd: state.cwd,
+    sessionId: state.sessionId)
   let request = UNNotificationRequest(
-    identifier: UUID().uuidString, content: content, trigger: nil)
+    identifier: notificationIdentifier(sessionId: state.sessionId), content: content,
+    trigger: nil)
   try? await UNUserNotificationCenter.current().add(request)
 }

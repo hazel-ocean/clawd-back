@@ -15,6 +15,17 @@ struct MultiplexerFocusTarget: Equatable, Codable {
   let pane: String
 }
 
+// How reachable a session is right now. Drives both the failure the user is
+// told about and whether a saved target is still worth keeping.
+enum MultiplexerSessionState: Equatable {
+  case attached
+  case detached
+  // Not in the session list at all: renamed or killed.
+  case missing
+  // No way to ask (no multiplexer binary on this machine).
+  case unreachable
+}
+
 // Capability: locate the current pane and focus a specific one. A future tmux
 // is just another conformer.
 protocol MultiplexerFocus {
@@ -27,9 +38,8 @@ protocol MultiplexerFocus {
   // Is any client currently focused on `target`'s pane? (skip-when-viewing)
   func isFocused(on target: MultiplexerFocusTarget) -> Bool
 
-  // Is any client attached to `target`'s session at all? False ⇒ detached, so a
-  // pane focus would be invisible.
-  func isAttached(on target: MultiplexerFocusTarget) -> Bool
+  // Where `target`'s session stands: reachable, idle, gone, or unaskable.
+  func sessionState(on target: MultiplexerFocusTarget) -> MultiplexerSessionState
 
   // Shell steps that focus `target`'s pane.
   func focusSteps(for target: MultiplexerFocusTarget) -> [String]
@@ -45,26 +55,40 @@ struct Zellij: MultiplexerFocus {
     return MultiplexerFocusTarget(kind: .zellij, session: session, pane: pane)
   }
 
-  // `zellij action list-clients` maps each client to its focused ZELLIJ_PANE_ID
-  // (e.g. "terminal_4"); match that column exactly.
-  func isFocused(on target: MultiplexerFocusTarget) -> Bool {
+  // The client rows of `zellij action list-clients`, or nil when the output is
+  // not a client list at all. For an unknown or exited session the command still
+  // exits 0 and prints the whole session list on stdout, so the CLIENT_ID header
+  // is the only proof that the rest of the output describes clients. Reading
+  // those session rows as clients is what made a renamed session look attached.
+  private func clientRows(on target: MultiplexerFocusTarget) -> [String]? {
     guard let zellij = findZellijPath(),
       let out = runProcess(zellij, ["--session", target.session, "action", "list-clients"])
-    else { return false }
-    let needle = "terminal_\(target.pane)"
-    return out.split(separator: "\n").dropFirst().contains { line in
-      line.split(whereSeparator: { $0 == " " || $0 == "\t" }).contains { String($0) == needle }
-    }
+    else { return nil }
+    let lines = out.split(separator: "\n").map(String.init)
+    guard let header = lines.first, header.hasPrefix("CLIENT_ID") else { return nil }
+    return lines.dropFirst().filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
   }
 
-  // Any data row past the header means a client is attached; no row (or an error
-  // because the session is gone) means detached.
-  func isAttached(on target: MultiplexerFocusTarget) -> Bool {
-    guard let zellij = findZellijPath(),
-      let out = runProcess(zellij, ["--session", target.session, "action", "list-clients"])
-    else { return false }
-    return out.split(separator: "\n").dropFirst().contains {
-      !$0.trimmingCharacters(in: .whitespaces).isEmpty
+  // `list-sessions --short --no-formatting` prints one exact name per line,
+  // exited sessions included, so an absent name means the session is really
+  // gone. A non-zero run is zellij reporting no sessions at all, which is the
+  // same answer for this target.
+  func sessionState(on target: MultiplexerFocusTarget) -> MultiplexerSessionState {
+    guard let zellij = findZellijPath() else { return .unreachable }
+    guard let out = runProcess(zellij, ["list-sessions", "--short", "--no-formatting"]),
+      out.split(separator: "\n").map(String.init).contains(target.session)
+    else { return .missing }
+    guard let rows = clientRows(on: target) else { return .detached }
+    return rows.isEmpty ? .detached : .attached
+  }
+
+  // Each client row carries its focused ZELLIJ_PANE_ID (e.g. "terminal_4");
+  // match that column exactly.
+  func isFocused(on target: MultiplexerFocusTarget) -> Bool {
+    guard let rows = clientRows(on: target) else { return false }
+    let needle = "terminal_\(target.pane)"
+    return rows.contains { line in
+      line.split(whereSeparator: { $0 == " " || $0 == "\t" }).contains { String($0) == needle }
     }
   }
 

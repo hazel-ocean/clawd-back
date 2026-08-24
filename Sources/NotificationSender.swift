@@ -18,42 +18,68 @@ private func randomCrabAttachment() -> UNNotificationAttachment? {
 }
 
 // SessionStart / UserPromptSubmit: record where Claude is running, keyed by the
-// Claude session id, so later notify/click resolve the exact window. Only runs
-// when the terminal is frontmost (which it is at these events), so a background
-// event can't overwrite a good capture with the wrong window.
+// Claude session id, so later notify/click resolve the exact window. The record
+// is only written while the terminal is frontmost, so a background event can't
+// overwrite a good capture with the wrong window. The dismissal is not gated
+// that way (see below).
 // Returns true when a dismissal was issued, so the caller can stay alive for it.
 @discardableResult
 func captureAndSave(args: [String]) -> Bool {
   guard let sessionId = parseArg(args, flag: "--session-id"), !sessionId.isEmpty else {
     return false
   }
-  let term = loadConfiguredApp()
-  guard term.isFrontmost else { return false }
-
   let existing = StateStore.load(sessionId)
-  // Never clobber a good target with a transient capture miss: keep the prior
-  // value if this read fails. The multiplexer session name only legitimately
-  // changes on rename (which rewrites the file directly), so don't re-stale it
-  // from the spawn-time env each UserPromptSubmit.
-  let terminalTarget = (term as? WindowFocus)?.frontTarget() ?? existing?.terminal
-  let multiplexerTarget =
-    existing?.multiplexer
-    ?? captureMultiplexerTarget(env: ProcessInfo.processInfo.environment)
 
-  // Both events fire from Claude's pane while the terminal is frontmost, so the
-  // user is back and any banner this session left behind is stale.
+  // The prompt was submitted from Claude's pane, so any banner this session left
+  // behind is stale. That holds whatever is frontmost by the time this process
+  // launches, so the dismissal runs before the capture's frontmost gate: the
+  // user can hit enter and switch away faster than we start.
   let dismissed = existing?.notified == true
   if dismissed { dismissNotification(sessionId: sessionId) }
 
-  let state = SessionState(terminal: terminalTarget, multiplexer: multiplexerTarget)
-  // An all-empty state is never written, so clear the file instead: leaving a
-  // stale `notified` behind would re-arm the dismissal on every prompt.
+  let term = loadConfiguredApp()
+  // A capture is only trustworthy while the terminal is frontmost.
+  guard term.isFrontmost else {
+    // Drop the notified flag anyway, or the next prompt pays the removal round
+    // trip for a banner that is already gone.
+    if dismissed {
+      persist(
+        SessionState(terminal: existing?.terminal, multiplexer: existing?.multiplexer),
+        sessionId: sessionId)
+    }
+    return dismissed
+  }
+
+  // Never clobber a good target with a transient capture miss: keep the prior
+  // value if this read fails.
+  let terminalTarget = (term as? WindowFocus)?.frontTarget() ?? existing?.terminal
+  let multiplexerTarget: MultiplexerFocusTarget?
+  switch existing?.multiplexer {
+  case .some(let target):
+    // A saved session that no longer exists fails every focus and every
+    // skip-when-viewing probe, so drop it and keep the window. The env can't
+    // repair it: zellij doesn't rewrite ZELLIJ_SESSION_NAME in a running pane,
+    // so after a rename it names the same dead session.
+    let state = multiplexer(for: target.kind).sessionState(on: target)
+    multiplexerTarget = state == .missing ? nil : target
+  case .none:
+    multiplexerTarget = captureMultiplexerTarget(env: ProcessInfo.processInfo.environment)
+  }
+
+  persist(
+    SessionState(terminal: terminalTarget, multiplexer: multiplexerTarget),
+    sessionId: sessionId)
+  return dismissed
+}
+
+// An all-empty state is never written, so clear the file instead: leaving a
+// stale `notified` behind would re-arm the dismissal on every prompt.
+private func persist(_ state: SessionState, sessionId: String) {
   if state.isEmpty {
     StateStore.clear(sessionId)
   } else {
     StateStore.save(state, sessionId: sessionId)
   }
-  return dismissed
 }
 
 func sendNotification(args: [String]) async {
@@ -111,7 +137,7 @@ func sendNotification(args: [String]) async {
   content.interruptionLevel = .timeSensitive
   content.userInfo = FocusPayload.userInfo(
     terminal: terminalTarget, multiplexer: multiplexerTarget,
-    title: baseTitle, message: message, folder: folder, cwd: cwd)
+    title: baseTitle, message: message, folder: folder, cwd: cwd, sessionId: sessionId)
   if let crab = randomCrabAttachment() {
     content.attachments = [crab]
   }

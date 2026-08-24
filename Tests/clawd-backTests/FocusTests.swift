@@ -28,10 +28,10 @@ private struct FakeMux: MultiplexerFocus {
   let kind: MultiplexerKind
   var focused: Bool
   var steps: [String]
-  var attached: Bool = true
+  var state: MultiplexerSessionState = .attached
   func currentTarget(env: [String: String]) -> MultiplexerFocusTarget? { nil }
   func isFocused(on target: MultiplexerFocusTarget) -> Bool { focused }
-  func isAttached(on target: MultiplexerFocusTarget) -> Bool { attached }
+  func sessionState(on target: MultiplexerFocusTarget) -> MultiplexerSessionState { state }
   func focusSteps(for target: MultiplexerFocusTarget) -> [String] { steps }
 }
 
@@ -108,7 +108,27 @@ final class ResolveFocusTests: XCTestCase {
   func testDetachedSessionFails() {
     let term = FakeWindowTerminal(
       kind: .ghostty, isFrontmost: false, front: nil, steps: ["SELECT"])
-    let mux = FakeMux(kind: .zellij, focused: false, steps: ["FOCUS"], attached: false)
+    let mux = FakeMux(kind: .zellij, focused: false, steps: ["FOCUS"], state: .detached)
+    let outcome = resolveFocus(
+      term: term, terminalTarget: winTarget, multiplexerTarget: muxTarget,
+      resolveMultiplexer: resolve(mux))
+    XCTAssertEqual(failure(outcome), .sessionDetached)
+  }
+
+  func testMissingSessionFailsDistinctly() {
+    let term = FakeWindowTerminal(
+      kind: .ghostty, isFrontmost: false, front: nil, steps: ["SELECT"])
+    let mux = FakeMux(kind: .zellij, focused: false, steps: ["FOCUS"], state: .missing)
+    let outcome = resolveFocus(
+      term: term, terminalTarget: winTarget, multiplexerTarget: muxTarget,
+      resolveMultiplexer: resolve(mux))
+    XCTAssertEqual(failure(outcome), .sessionMissing)
+  }
+
+  func testUnreachableMultiplexerReadsAsDetached() {
+    let term = FakeWindowTerminal(
+      kind: .ghostty, isFrontmost: false, front: nil, steps: ["SELECT"])
+    let mux = FakeMux(kind: .zellij, focused: false, steps: ["FOCUS"], state: .unreachable)
     let outcome = resolveFocus(
       term: term, terminalTarget: winTarget, multiplexerTarget: muxTarget,
       resolveMultiplexer: resolve(mux))
@@ -126,7 +146,7 @@ final class ResolveFocusTests: XCTestCase {
   func testDetachedWinsOverGoneWindow() {
     let term = FakeWindowTerminal(
       kind: .ghostty, isFrontmost: false, front: nil, steps: ["SELECT"], exists: false)
-    let mux = FakeMux(kind: .zellij, focused: false, steps: ["FOCUS"], attached: false)
+    let mux = FakeMux(kind: .zellij, focused: false, steps: ["FOCUS"], state: .detached)
     let outcome = resolveFocus(
       term: term, terminalTarget: winTarget, multiplexerTarget: muxTarget,
       resolveMultiplexer: resolve(mux))
@@ -158,72 +178,116 @@ final class FocusPayloadTests: XCTestCase {
   func testRoundTripsMessageFolderAndCwd() {
     let info = FocusPayload.userInfo(
       terminal: winTarget, multiplexer: muxTarget,
-      title: "Claude Code", message: "needs you", folder: "myrepo", cwd: "/repos/myrepo")
+      title: "Claude Code", message: "needs you", folder: "myrepo", cwd: "/repos/myrepo",
+      sessionId: "abc-123")
     let state = FocusPayload.decode(info)
     XCTAssertEqual(state.terminal, winTarget)
     XCTAssertEqual(state.multiplexer, muxTarget)
     XCTAssertEqual(state.message, "needs you")
     XCTAssertEqual(state.folder, "myrepo")
     XCTAssertEqual(state.cwd, "/repos/myrepo")
+    XCTAssertEqual(state.sessionId, "abc-123")
   }
 
   func testEmptyFolderAndCwdDecodeNil() {
     let info = FocusPayload.userInfo(
-      terminal: nil, multiplexer: nil, title: "T", message: "m", folder: nil, cwd: nil)
+      terminal: nil, multiplexer: nil, title: "T", message: "m", folder: nil, cwd: nil,
+      sessionId: nil)
     let state = FocusPayload.decode(info)
     XCTAssertNil(state.folder)
     XCTAssertNil(state.cwd)
+    XCTAssertNil(state.sessionId)
   }
 }
 
 final class LocatorContentTests: XCTestCase {
   private let muxTarget = MultiplexerFocusTarget(kind: .zellij, session: "main", pane: "3")
+  private let winTarget = WindowFocusTarget(window: "w1", tab: "t1")
 
-  func testDetachedNamesSessionAndAttachHint() {
-    let state = FocusState(
-      terminal: nil, multiplexer: muxTarget,
-      title: "Claude Code", message: "needs you", folder: "myrepo")
-    let (title, body) = locatorContent(.sessionDetached, state: state)
-    XCTAssertTrue(title.contains("myrepo"))
-    XCTAssertTrue(body.contains("zellij attach main"))
+  private func state(
+    mux: MultiplexerFocusTarget?, folder: String? = nil, cwd: String? = nil,
+    message: String = "needs you"
+  ) -> FocusState {
+    FocusState(
+      terminal: winTarget, multiplexer: mux, title: "Claude Code", message: message,
+      folder: folder, cwd: cwd)
   }
 
-  func testDetachedIncludesCwdWhenKnown() {
-    let state = FocusState(
-      terminal: nil, multiplexer: muxTarget,
-      title: "Claude Code", message: "needs you", folder: nil, cwd: "/repos/myrepo")
-    let (_, body) = locatorContent(.sessionDetached, state: state)
-    XCTAssertTrue(body.contains("zellij attach main"))
-    XCTAssertTrue(body.contains("/repos/myrepo"))
+  func testTitleLeadsWithSessionAndIssue() {
+    let (title, body) = locatorContent(.windowGone, state: state(mux: muxTarget))
+    XCTAssertEqual(title, "[main] - Window closed")
+    XCTAssertTrue(body.contains("The zellij session is attached elsewhere."))
+    // The title names the session, so the body does not repeat it.
+    XCTAssertFalse(body.contains("main"))
   }
 
-  func testWindowGoneWithMuxNamesSessionNotStaleWindow() {
-    let term = WindowFocusTarget(window: "w1", tab: "t1")
-    let state = FocusState(
-      terminal: term, multiplexer: muxTarget,
-      title: "Claude Code", message: "needs you", folder: nil, cwd: nil)
-    let (title, body) = locatorContent(.windowGone, state: state)
-    XCTAssertTrue(title.contains("Window closed"))
-    XCTAssertTrue(body.contains("zellij attach main"))
+  func testSessionNameWinsOverFolderLabel() {
+    let (title, _) = locatorContent(.windowGone, state: state(mux: muxTarget, folder: "myrepo"))
+    XCTAssertEqual(title, "[main] - Window closed")
+  }
+
+  func testFolderLabelsTheTitleWithoutASession() {
+    let (title, body) = locatorContent(.windowGone, state: state(mux: nil, folder: "myrepo"))
+    XCTAssertEqual(title, "[myrepo] - Window closed")
+    XCTAssertTrue(body.contains("The terminal window is closed."))
+  }
+
+  func testDetachedQuotesTheAttachCommand() {
+    let spaced = MultiplexerFocusTarget(kind: .zellij, session: "my main", pane: "3")
+    let (title, body) = locatorContent(.sessionDetached, state: state(mux: spaced))
+    XCTAssertEqual(title, "[my main] - Session detached")
+    XCTAssertTrue(body.contains("Attach: zellij attach 'my main'"))
+  }
+
+  func testMissingSessionSaysItMayBeRenamed() {
+    let (title, body) = locatorContent(.sessionMissing, state: state(mux: muxTarget))
+    XCTAssertEqual(title, "[main] - Session not found")
+    XCTAssertTrue(body.contains("gone, possibly renamed"))
+  }
+
+  func testTranscriptMessageIsNotInTheBody() {
+    let (_, body) = locatorContent(
+      .windowGone, state: state(mux: muxTarget, message: "Good question, and it exposes"))
+    XCTAssertFalse(body.contains("Good question"))
+  }
+
+  func testStaleWindowIdsAreNotInTheBody() {
+    let (_, body) = locatorContent(.windowGone, state: state(mux: muxTarget))
     XCTAssertFalse(body.contains("w1"))
     XCTAssertFalse(body.contains("t1"))
   }
 
-  func testWindowGoneNoMuxNamesCwd() {
-    let state = FocusState(
-      terminal: WindowFocusTarget(window: "w1", tab: "t1"), multiplexer: nil,
-      title: "Claude Code", message: "needs you", folder: nil, cwd: "/repos/myrepo")
-    let (_, body) = locatorContent(.windowGone, state: state)
-    XCTAssertTrue(body.contains("/repos/myrepo"))
-    XCTAssertFalse(body.contains("w1"))
+  func testLongCwdIsAbbreviated() {
+    let home = FileManager.default.homeDirectoryForCurrentUser.path
+    let (_, body) = locatorContent(
+      .windowGone,
+      state: state(mux: muxTarget, cwd: "\(home)/OneSignal/workbench/workspaces/sms-1580"))
+    XCTAssertTrue(body.contains("Last in: ~/…/workbench/workspaces/sms-1580"))
   }
 
-  func testWindowGoneNoMuxNoCwdFallsBack() {
-    let state = FocusState(
-      terminal: nil, multiplexer: nil,
-      title: "Claude Code", message: "needs you", folder: nil, cwd: nil)
-    let (_, body) = locatorContent(.windowGone, state: state)
-    XCTAssertTrue(body.contains("no longer open"))
+  func testShortCwdIsShownWhole() {
+    let (_, body) = locatorContent(.windowGone, state: state(mux: muxTarget, cwd: "/repos/myrepo"))
+    XCTAssertTrue(body.contains("Last in: /repos/myrepo"))
+  }
+
+  func testNoCwdLeavesTheBodyAtOneLine() {
+    let (_, body) = locatorContent(.windowGone, state: state(mux: muxTarget))
+    XCTAssertEqual(body, "The zellij session is attached elsewhere.")
+  }
+}
+
+final class BannerPathTests: XCTestCase {
+  func testHomeBecomesTilde() {
+    let home = FileManager.default.homeDirectoryForCurrentUser.path
+    XCTAssertEqual(bannerPath("\(home)/a/b"), "~/a/b")
+  }
+
+  func testDeepAbsolutePathKeepsTheLastThree() {
+    XCTAssertEqual(bannerPath("/a/b/c/d/e"), "/…/c/d/e")
+  }
+
+  func testShallowPathIsUnchanged() {
+    XCTAssertEqual(bannerPath("/a/b/c"), "/a/b/c")
   }
 }
 
