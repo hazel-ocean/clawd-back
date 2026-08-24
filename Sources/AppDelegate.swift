@@ -52,6 +52,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
       plan.runDetached()
       terminateApp()
     case .failure(let reason):
+      // One locator per failure. Clicking a locator retries the focus, but a
+      // second failure is silent: re-notifying would post a new banner on every
+      // click.
+      guard !state.isLocator else {
+        terminateApp()
+        return
+      }
       // Couldn't reach the session: post the locator notification, then quit
       // once it's delivered.
       Task {

@@ -25,6 +25,10 @@ struct FocusState: Equatable {
   // Keys the locator notification to the same banner it replaces, so the next
   // prompt can dismiss it.
   var sessionId: String? = nil
+  // True for the locator itself. A locator carries the same targets as the
+  // banner it replaced, so without this a click on one that still can't reach
+  // its target posts another locator, and every click posts one more.
+  var isLocator: Bool = false
 }
 
 // Configurable reaction to a FocusFailure, decoded from config like Application.
@@ -138,7 +142,7 @@ private func sendLocatorNotification(_ failure: FocusFailure, state: FocusState)
   content.userInfo = FocusPayload.userInfo(
     terminal: state.terminal, multiplexer: state.multiplexer,
     title: state.title, message: state.message, folder: state.folder, cwd: state.cwd,
-    sessionId: state.sessionId)
+    sessionId: state.sessionId, isLocator: true)
   let request = UNNotificationRequest(
     identifier: notificationIdentifier(sessionId: state.sessionId), content: content,
     trigger: nil)

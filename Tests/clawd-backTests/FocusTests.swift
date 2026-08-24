@@ -181,6 +181,7 @@ final class FocusPayloadTests: XCTestCase {
       title: "Claude Code", message: "needs you", folder: "myrepo", cwd: "/repos/myrepo",
       sessionId: "abc-123")
     let state = FocusPayload.decode(info)
+    XCTAssertFalse(state.isLocator)
     XCTAssertEqual(state.terminal, winTarget)
     XCTAssertEqual(state.multiplexer, muxTarget)
     XCTAssertEqual(state.message, "needs you")
@@ -197,6 +198,16 @@ final class FocusPayloadTests: XCTestCase {
     XCTAssertNil(state.folder)
     XCTAssertNil(state.cwd)
     XCTAssertNil(state.sessionId)
+  }
+}
+
+final class LocatorPayloadTests: XCTestCase {
+  // A locator has to be recognisable on click, or clicking one posts another.
+  func testLocatorFlagRoundTrips() {
+    let info = FocusPayload.userInfo(
+      terminal: nil, multiplexer: nil, title: "T", message: "m", folder: nil, cwd: nil,
+      sessionId: "abc-123", isLocator: true)
+    XCTAssertTrue(FocusPayload.decode(info).isLocator)
   }
 }
 
