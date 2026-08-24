@@ -2,12 +2,10 @@
 # Build a versioned, zipped app bundle for a release. Invoked by semantic-release
 # with the computed version as the first argument.
 def main [version: string] {
-  (
-    ^/usr/libexec/PlistBuddy
-      -c $"Set :CFBundleVersion ($version)"
-      -c $"Set :CFBundleShortVersionString ($version)"
-      Resources/Info.plist
-  )
+  # The single source of truth for the version: `just bundle` and the nix
+  # derivation both stamp the bundle from it. Committed back by
+  # @semantic-release/git, so a checkout knows what it is.
+  $"($version)\n" | save -f VERSION
 
   ^just bundle
 

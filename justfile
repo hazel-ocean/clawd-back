@@ -31,6 +31,7 @@ bundle: release
     @cp -R Resources/. {{bundle_name}}/Contents/Resources/
     @mv {{bundle_name}}/Contents/Resources/Info.plist {{bundle_name}}/Contents/
     @rm -f {{bundle_name}}/Contents/Resources/entitlements.plist
+    @sed -i "" "s|0.0.0-dev|$(cat VERSION)|g" {{bundle_name}}/Contents/Info.plist
     @find Sources -name '*.applescript' -exec sh -c 'd="{{bundle_name}}/Contents/Resources/$(dirname "${1#Sources/}")"; mkdir -p "$d"; cp "$1" "$d/"' _ {} \;
     @cp -R hooks {{bundle_name}}/Contents/Resources/
     @chmod +x {{bundle_name}}/Contents/Resources/hooks/*/*

@@ -12,10 +12,13 @@ let
   # offline in the nix sandbox. Regenerate ./nix after changing deps:
   #   swift package resolve && nix run nixpkgs#swiftpm2nix
   generated = swiftpm2nix.helpers ./nix;
+  # Written by the release (see scripts/build-release.nu), so the store path and
+  # the bundle report the same version the release published.
+  version = lib.fileContents ./VERSION;
 in
 stdenv.mkDerivation {
   pname = "clawd-back";
-  version = "1.0.0";
+  inherit version;
 
   src = lib.cleanSourceWith {
     src = ./.;
@@ -61,6 +64,10 @@ stdenv.mkDerivation {
     cp -R Resources/. "$app/Contents/Resources/"
     mv "$app/Contents/Resources/Info.plist" "$app/Contents/"
     rm -f "$app/Contents/Resources/entitlements.plist"
+
+    # The tree carries a placeholder version, so stamp the real one in.
+    substituteInPlace "$app/Contents/Info.plist" \
+      --replace-fail 0.0.0-dev "${version}"
 
     # Every terminal's AppleScripts, preserving their per-terminal subdir so
     # bundledResource("<Term>/<script>") resolves. Wildcarded, not enumerated.
