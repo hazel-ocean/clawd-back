@@ -29,9 +29,14 @@ private struct FakeMux: MultiplexerFocus {
   var focused: Bool
   var steps: [String]
   var state: MultiplexerSessionState = .attached
+  // Per-session override, for the recapture cases where one target is alive and
+  // the other is not.
+  var states: [String: MultiplexerSessionState] = [:]
   func currentTarget(env: [String: String]) -> MultiplexerFocusTarget? { nil }
   func isFocused(on target: MultiplexerFocusTarget) -> Bool { focused }
-  func sessionState(on target: MultiplexerFocusTarget) -> MultiplexerSessionState { state }
+  func sessionState(on target: MultiplexerFocusTarget) -> MultiplexerSessionState {
+    states[target.session] ?? state
+  }
   func focusSteps(for target: MultiplexerFocusTarget) -> [String] { steps }
 }
 
@@ -365,5 +370,108 @@ final class IsViewingTests: XCTestCase {
       isViewing(
         term: term, terminalTarget: winTarget, multiplexerTarget: muxTarget,
         resolveMultiplexer: resolve(mux)))
+  }
+}
+
+final class RecapturedTerminalTests: XCTestCase {
+  private let saved = WindowFocusTarget(window: "w1", tab: "t1")
+  private let live = WindowFocusTarget(window: "w2", tab: "t2")
+  private let muxTarget = MultiplexerFocusTarget(kind: .zellij, session: "main", pane: "3")
+
+  private func resolve(_ mux: FakeMux) -> (MultiplexerKind) -> any MultiplexerFocus {
+    { _ in mux }
+  }
+
+  func testFrontmostReadReplacesTheSavedTarget() {
+    let term = FakeWindowTerminal(kind: .ghostty, isFrontmost: true, front: live, steps: [])
+    XCTAssertEqual(
+      recapturedTerminal(term: term, existing: saved, multiplexer: nil), live)
+  }
+
+  func testFocusedPaneTrustsTheReadWhileBackgrounded() {
+    // Pane focus is a fact about this session's own client, so it holds even
+    // with another app in front.
+    let term = FakeWindowTerminal(kind: .ghostty, isFrontmost: false, front: live, steps: [])
+    let mux = FakeMux(kind: .zellij, focused: true, steps: [])
+    XCTAssertEqual(
+      recapturedTerminal(
+        term: term, existing: saved, multiplexer: muxTarget, resolveMultiplexer: resolve(mux)),
+      live)
+  }
+
+  func testBackgroundKeepsASavedWindowThatIsStillOpen() {
+    let term = FakeWindowTerminal(
+      kind: .ghostty, isFrontmost: false, front: live, steps: [], exists: true)
+    let mux = FakeMux(kind: .zellij, focused: false, steps: [])
+    XCTAssertEqual(
+      recapturedTerminal(
+        term: term, existing: saved, multiplexer: muxTarget, resolveMultiplexer: resolve(mux)),
+      saved)
+  }
+
+  func testBackgroundDropsASavedWindowThatIsGone() {
+    // A dead window id blocks the mux-only focus that would still work, so it
+    // must not survive the prompt.
+    let term = FakeWindowTerminal(
+      kind: .ghostty, isFrontmost: false, front: live, steps: [], exists: false)
+    let mux = FakeMux(kind: .zellij, focused: false, steps: [])
+    XCTAssertNil(
+      recapturedTerminal(
+        term: term, existing: saved, multiplexer: muxTarget, resolveMultiplexer: resolve(mux)))
+  }
+
+  func testBaselineTerminalKeepsWhatItHas() {
+    // No window vocabulary, so there is nothing to read or check.
+    let term = FakeBaseline(kind: .rio, isFrontmost: true)
+    XCTAssertEqual(
+      recapturedTerminal(term: term, existing: saved, multiplexer: nil), saved)
+  }
+}
+
+final class RecapturedMultiplexerTests: XCTestCase {
+  private let saved = MultiplexerFocusTarget(kind: .zellij, session: "saved", pane: "3")
+  private let env = ["ZELLIJ_SESSION_NAME": "spawned", "ZELLIJ_PANE_ID": "0"]
+  private let spawned = MultiplexerFocusTarget(kind: .zellij, session: "spawned", pane: "0")
+
+  private func resolve(_ mux: FakeMux) -> (MultiplexerKind) -> any MultiplexerFocus {
+    { _ in mux }
+  }
+
+  func testLiveSavedSessionWins() {
+    let mux = FakeMux(kind: .zellij, focused: false, steps: [])
+    XCTAssertEqual(
+      recapturedMultiplexer(existing: saved, env: env, resolveMultiplexer: resolve(mux)), saved)
+  }
+
+  func testMissingSavedSessionFallsBackToTheEnv() {
+    let mux = FakeMux(
+      kind: .zellij, focused: false, steps: [], states: ["saved": .missing])
+    XCTAssertEqual(
+      recapturedMultiplexer(existing: saved, env: env, resolveMultiplexer: resolve(mux)), spawned)
+  }
+
+  func testBothMissingYieldsNothing() {
+    let mux = FakeMux(kind: .zellij, focused: false, steps: [], state: .missing)
+    XCTAssertNil(
+      recapturedMultiplexer(existing: saved, env: env, resolveMultiplexer: resolve(mux)))
+  }
+
+  func testDetachedSessionIsStillWorthKeeping() {
+    // Detached is recoverable: the locator can name the reattach.
+    let mux = FakeMux(kind: .zellij, focused: false, steps: [], state: .detached)
+    XCTAssertEqual(
+      recapturedMultiplexer(existing: saved, env: env, resolveMultiplexer: resolve(mux)), saved)
+  }
+
+  func testNoSavedTargetTakesTheEnv() {
+    let mux = FakeMux(kind: .zellij, focused: false, steps: [])
+    XCTAssertEqual(
+      recapturedMultiplexer(existing: nil, env: env, resolveMultiplexer: resolve(mux)), spawned)
+  }
+
+  func testNothingToCapture() {
+    let mux = FakeMux(kind: .zellij, focused: false, steps: [])
+    XCTAssertNil(
+      recapturedMultiplexer(existing: nil, env: [:], resolveMultiplexer: resolve(mux)))
   }
 }

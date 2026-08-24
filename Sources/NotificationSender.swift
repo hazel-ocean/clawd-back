@@ -17,11 +17,11 @@ private func randomCrabAttachment() -> UNNotificationAttachment? {
   return try? UNNotificationAttachment(identifier: "crab", url: tmp)
 }
 
-// SessionStart / UserPromptSubmit: record where Claude is running, keyed by the
-// Claude session id, so later notify/click resolve the exact window. The record
-// is only written while the terminal is frontmost, so a background event can't
-// overwrite a good capture with the wrong window. The dismissal is not gated
-// that way (see below).
+// SessionStart / UserPromptSubmit: re-derive where Claude is running, keyed by
+// the Claude session id, so later notify/click resolve the exact window. Every
+// prompt re-reads what it can and re-validates what it can't, because a target
+// that no longer resolves is worse than none: a dead window id makes
+// `resolveFocus` give up, where no window id at all still focuses the pane.
 // Returns true when a dismissal was issued, so the caller can stay alive for it.
 @discardableResult
 func captureAndSave(args: [String]) -> Bool {
@@ -32,44 +32,58 @@ func captureAndSave(args: [String]) -> Bool {
 
   // The prompt was submitted from Claude's pane, so any banner this session left
   // behind is stale. That holds whatever is frontmost by the time this process
-  // launches, so the dismissal runs before the capture's frontmost gate: the
-  // user can hit enter and switch away faster than we start.
+  // launches, so the dismissal never waits on the reads below: the user can hit
+  // enter and switch away faster than we start.
   let dismissed = existing?.notified == true
   if dismissed { dismissNotification(sessionId: sessionId) }
 
   let term = loadConfiguredApp()
-  // A capture is only trustworthy while the terminal is frontmost.
-  guard term.isFrontmost else {
-    // Drop the notified flag anyway, or the next prompt pays the removal round
-    // trip for a banner that is already gone.
-    if dismissed {
-      persist(
-        SessionState(terminal: existing?.terminal, multiplexer: existing?.multiplexer),
-        sessionId: sessionId)
-    }
-    return dismissed
-  }
-
-  // Never clobber a good target with a transient capture miss: keep the prior
-  // value if this read fails.
-  let terminalTarget = (term as? WindowFocus)?.frontTarget() ?? existing?.terminal
-  let multiplexerTarget: MultiplexerFocusTarget?
-  switch existing?.multiplexer {
-  case .some(let target):
-    // A saved session that no longer exists fails every focus and every
-    // skip-when-viewing probe, so drop it and keep the window. The env can't
-    // repair it: zellij doesn't rewrite ZELLIJ_SESSION_NAME in a running pane,
-    // so after a rename it names the same dead session.
-    let state = multiplexer(for: target.kind).sessionState(on: target)
-    multiplexerTarget = state == .missing ? nil : target
-  case .none:
-    multiplexerTarget = captureMultiplexerTarget(env: ProcessInfo.processInfo.environment)
-  }
+  let multiplexerTarget = recapturedMultiplexer(
+    existing: existing?.multiplexer, env: ProcessInfo.processInfo.environment)
+  let terminalTarget = recapturedTerminal(
+    term: term, existing: existing?.terminal, multiplexer: multiplexerTarget)
 
   persist(
     SessionState(terminal: terminalTarget, multiplexer: multiplexerTarget),
     sessionId: sessionId)
   return dismissed
+}
+
+// The window and tab to raise. A front-window read is only right when the front
+// window is the one this session lives in, which the OS frontmost check confirms
+// and a focused pane confirms independently: pane focus is a fact about this
+// session's own client, so it holds while another app sits in front. Failing
+// both, keep the saved target only while its window is still open.
+func recapturedTerminal(
+  term: any AppActivation,
+  existing: WindowFocusTarget?,
+  multiplexer: MultiplexerFocusTarget?,
+  resolveMultiplexer: (MultiplexerKind) -> any MultiplexerFocus = multiplexer(for:)
+) -> WindowFocusTarget? {
+  // No window/tab vocabulary at all, so there is nothing to read or check.
+  guard let wf = term as? WindowFocus else { return existing }
+
+  let paneConfirms =
+    multiplexer.map { resolveMultiplexer($0.kind).isFocused(on: $0) } ?? false
+  if term.isFrontmost || paneConfirms, let front = wf.frontTarget() {
+    return front
+  }
+  guard let existing, wf.windowExists(existing.window) else { return nil }
+  return existing
+}
+
+// The pane to focus. Neither source can see a rename: the env is fixed at
+// Claude's spawn, and the saved value only changes when something rewrites it.
+// So take whichever still names a live session, saved first, since a rename
+// through the workspace command rewrites the file.
+func recapturedMultiplexer(
+  existing: MultiplexerFocusTarget?,
+  env: [String: String],
+  resolveMultiplexer: (MultiplexerKind) -> any MultiplexerFocus = multiplexer(for:)
+) -> MultiplexerFocusTarget? {
+  [existing, captureMultiplexerTarget(env: env)]
+    .compactMap { $0 }
+    .first { resolveMultiplexer($0.kind).sessionState(on: $0) != .missing }
 }
 
 // An all-empty state is never written, so clear the file instead: leaving a
