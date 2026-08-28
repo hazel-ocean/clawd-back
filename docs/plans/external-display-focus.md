@@ -1,6 +1,7 @@
 # Plan: Claw-back focus across Spaces and external displays
 
-Status: proposed
+Status: implemented (Phase 2, in-process raise). Phase 0 and 1 were skipped: the
+measurements they proposed would not have changed the design.
 Bug: "External display focus" (Clawd Back)
 
 ## Problem
@@ -125,3 +126,24 @@ We also need the target's **`CGWindowID`**, which we do not store today (we save
 - `AppleSpacesSwitchOnActivate` setting: https://macos-defaults.com/mission-control/applespacesswitchonactivate.html
 - yabai SIP requirement for space focus/move: https://github.com/koekeishiya/yabai/issues/1532
 - Ghostty AppleScript features: https://ghostty.org/docs/features/applescript
+
+## What shipped
+
+- `Sources/WindowServer/SkyLight.swift` binds the private calls with `dlsym`, not
+  `@_silgen_name`. An absent symbol has to close the gate; an undefined symbol
+  reference would fail the dyld load and kill the process at launch, taking the
+  notify and capture paths with it.
+- Steps 1, 2 and 4 of the sequence run in-process. Step 3, the intra-app
+  `AXRaise`, stays in the detached shell, where Ghostty's `select tab` and the
+  generic path's `AXRaise` already did that job. It is the only step needing an
+  `AXUIElement`, and there is no window-id to element lookup, so keeping it out
+  avoids a brute-force search and an element cache.
+- The gate is Apple Silicon (compile-time, because AltTab #5819 is an x86_64 ABI
+  bug), macOS 14 as a floor, and `majorVersion < 27` as a ceiling. The ceiling
+  is a "tested no further than this" tripwire, not protection against interface
+  change: these symbols have not moved since 10.12, and what churns is correct
+  usage. `forceWindowServerRaiseEnabled` lifts the ceiling only.
+- `WindowFocusTarget` carries the `CGWindowID`, read with public
+  `CGWindowListCopyWindowInfo` at capture time. `windowExists` prefers it, which
+  also fixed a separate bug: the generic path addresses windows by title, so an
+  app that retitles with the open document read as closed.

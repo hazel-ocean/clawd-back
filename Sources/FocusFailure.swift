@@ -44,7 +44,8 @@ func resolveFocus(
   term: any AppActivation,
   terminalTarget: WindowFocusTarget?,
   multiplexerTarget: MultiplexerFocusTarget?,
-  resolveMultiplexer: (MultiplexerKind) -> any MultiplexerFocus = multiplexer(for:)
+  resolveMultiplexer: (MultiplexerKind) -> any MultiplexerFocus = multiplexer(for:),
+  raiseSupported: Bool = architectureSupported
 ) -> FocusOutcome {
   if let mux = multiplexerTarget {
     switch resolveMultiplexer(mux.kind).sessionState(on: mux) {
@@ -59,14 +60,14 @@ func resolveFocus(
     }
   }
   if let wf = term as? WindowFocus, let target = terminalTarget,
-    !wf.windowExists(target.window)
+    !wf.windowExists(target)
   {
     return .failure(.windowGone)
   }
   return .focus(
     focusPlan(
       term: term, terminalTarget: terminalTarget, multiplexerTarget: multiplexerTarget,
-      resolveMultiplexer: resolveMultiplexer))
+      resolveMultiplexer: resolveMultiplexer, raiseSupported: raiseSupported))
 }
 
 func handleFocusFailure(

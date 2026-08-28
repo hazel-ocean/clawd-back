@@ -1,4 +1,5 @@
 import AppKit
+import CoreGraphics
 import Foundation
 
 // Applications ClawdBack knows how to claw back to. The config's `application`
@@ -29,6 +30,21 @@ enum Application: String, Codable, CaseIterable {
 struct WindowFocusTarget: Equatable, Codable {
   let window: String
   let tab: String?
+  // What a cross-Space raise addresses. Optional: state files and payloads
+  // written before it existed still decode.
+  var cgWindowId: CGWindowID?
+
+  init(window: String, tab: String?, cgWindowId: CGWindowID? = nil) {
+    self.window = window
+    self.tab = tab
+    self.cgWindowId = cgWindowId
+  }
+
+  // A fresh read and a stored target routinely disagree on the window id, one
+  // side having been captured before the other.
+  func isSameWindow(as other: Self) -> Bool {
+    window == other.window && tab == other.tab
+  }
 }
 
 // Every app ClawdBack can drive. Identity + activation need nothing but a
@@ -39,9 +55,16 @@ protocol AppActivation {
   // A requirement (not just an extension member) so it dispatches dynamically
   // and tests can supply an app with a known frontmost state.
   var isFrontmost: Bool { get }
+  var pid: pid_t? { get }
 }
 
 extension AppActivation {
+  var pid: pid_t? {
+    NSWorkspace.shared.runningApplications
+      .first { $0.bundleIdentifier == bundleIdentifier }?
+      .processIdentifier
+  }
+
   var isFrontmost: Bool {
     NSWorkspace.shared.frontmostApplication?.bundleIdentifier == bundleIdentifier
   }
@@ -67,10 +90,13 @@ protocol WindowFocus: AppActivation {
   func frontTarget() -> WindowFocusTarget?
 
   // Does the captured window still exist? False ⇒ claw-back can't land on it.
-  func windowExists(_ window: String) -> Bool
+  // Takes the whole target so a conformer can prefer the window id.
+  func windowExists(_ target: WindowFocusTarget) -> Bool
 
-  // Shell steps that raise `target`'s window and select its tab.
-  func focusSteps(for target: WindowFocusTarget) -> [String]
+  // Shell steps that raise `target`'s window and select its tab. Under
+  // `raised` an activation here is redundant and, being async, can land after
+  // the WindowServer raise and steal focus to another Space's window.
+  func focusSteps(for target: WindowFocusTarget, raised: Bool) -> [String]
 }
 
 // An app we can raise but not address by window/tab. Used for the named

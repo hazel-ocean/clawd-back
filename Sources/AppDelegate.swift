@@ -49,8 +49,29 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
     case .focus(let plan):
       // Raise the saved window, select its tab, and in a multiplexer switch the
       // session to Claude's pane.
+      guard let raise = plan.raise else {
+        plan.runDetached()
+        terminateApp()
+        return
+      }
+      // A failed raise leaves the plan short of the activation its steps would
+      // otherwise carry, so rebuild it rather than run a half plan.
+      guard raiseWindow(raise, forceEnabled: forceWindowServerRaiseEnabled()) else {
+        counter(.fellBackToShellPlan)
+        focusPlan(
+          term: term, terminalTarget: state.terminal, multiplexerTarget: state.multiplexer,
+          raiseSupported: false
+        ).runDetached()
+        terminateApp()
+        return
+      }
       plan.runDetached()
-      terminateApp()
+      // Outlive the Space switch: it is animated, and quitting mid-transition
+      // hands focus back to the app macOS reactivates for us.
+      Task {
+        try? await Task.sleep(for: .milliseconds(150))
+        await MainActor.run { NSApplication.shared.terminate(nil) }
+      }
     case .failure(let reason):
       // One locator per failure. Clicking a locator retries the focus, but a
       // second failure is silent: re-notifying would post a new banner on every

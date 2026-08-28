@@ -16,7 +16,8 @@ final class AccessibilityAppTests: XCTestCase {
   func testUnbundledOrUnresolvedProcessFailsGracefully() {
     let app = AccessibilityApp(bundleIdentifier: "com.example.nonexistent")
     XCTAssertNil(app.frontTarget())
-    XCTAssertFalse(app.windowExists("Some Window"))
-    XCTAssertEqual(app.focusSteps(for: WindowFocusTarget(window: "Some Window", tab: nil)), [])
+    let target = WindowFocusTarget(window: "Some Window", tab: nil)
+    XCTAssertFalse(app.windowExists(target))
+    XCTAssertEqual(app.focusSteps(for: target, raised: false), [])
   }
 }

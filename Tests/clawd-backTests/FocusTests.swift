@@ -9,6 +9,7 @@ private let waitForQuit = ["while kill -0 \"$CLAWD_PID\" 2>/dev/null; do sleep 0
 private struct FakeBaseline: AppActivation {
   let kind: Application
   var isFrontmost: Bool
+  var pid: pid_t? = nil
   var bundleIdentifier: String { kind.bundleIdentifier! }
 }
 
@@ -18,10 +19,13 @@ private struct FakeWindowTerminal: WindowFocus {
   var front: WindowFocusTarget?
   var steps: [String]
   var exists: Bool = true
+  var pid: pid_t? = nil
   var bundleIdentifier: String { kind.bundleIdentifier! }
   func frontTarget() -> WindowFocusTarget? { front }
-  func windowExists(_ window: String) -> Bool { exists }
-  func focusSteps(for target: WindowFocusTarget) -> [String] { steps }
+  func windowExists(_ target: WindowFocusTarget) -> Bool { exists }
+  func focusSteps(for target: WindowFocusTarget, raised: Bool) -> [String] {
+    raised ? steps.filter { !$0.hasPrefix("/usr/bin/open") } : steps
+  }
 }
 
 private struct FakeMux: MultiplexerFocus {

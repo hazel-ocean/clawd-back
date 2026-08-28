@@ -68,7 +68,7 @@ func recapturedTerminal(
   if term.isFrontmost || paneConfirms, let front = wf.frontTarget() {
     return front
   }
-  guard let existing, wf.windowExists(existing.window) else { return nil }
+  guard let existing, wf.windowExists(existing) else { return nil }
   return existing
 }
 

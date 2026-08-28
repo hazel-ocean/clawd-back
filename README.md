@@ -137,8 +137,26 @@ bundleIdentifier = "com.example.SomeApp"
 
 This addresses the app's window by title via generic Accessibility scripting
 rather than a stable id, so it's best-effort: it needs the Accessibility
-permission above, and a window whose title changes between capture and click
-is reported as closed rather than raised.
+permission above. The window is still tracked by its WindowServer id, so an
+app that retitles between capture and click stays reachable.
+
+### Cross-Space and full-screen focus
+
+A full-screen window is its own Mission Control Space, and no public API moves
+focus across a Space. ClawdBack fronts the saved window through the
+WindowServer directly, which carries the screen to it. That path is verified on
+Apple Silicon, macOS 14 through 26; outside that range it falls back to
+activating the app, so a full-screen target is reached only if macOS happens to
+switch Spaces on activation.
+
+To try it on a macOS release it has not been verified against:
+
+```toml
+forceWindowServerRaiseEnabled = true
+```
+
+This lifts the upper bound only. The lower bound and the Apple Silicon
+requirement stand.
 
 ## How it works
 
@@ -162,7 +180,9 @@ SessionEnd     -->  open ClawdBack.app --args cleanup --session-id <id>
                     removes ~/.cache/clawd-back/<id>.json
 ```
 
-Targeting is by the saved OS window id captured at `SessionStart`, so it is exact regardless of what is frontmost when a notification fires. Ghostty implements window/tab capture + select via its own AppleScript dictionary; `generic` implements window capture + raise via System Events/Accessibility (title-based, best-effort); the other named terminals fall back to activating the app (+ `focus-pane-id`).
+Targeting is by the saved OS window id captured at `SessionStart`, so it is exact regardless of what is frontmost when a notification fires. Ghostty implements window/tab capture + select via its own AppleScript dictionary; `generic` implements window capture + raise via System Events/Accessibility (title-based, best-effort); the other named terminals fall back to activating the app (+ `focus-pane-id`). Both window-addressing paths also save the WindowServer id of the window, which is what carries focus across Spaces and into a full-screen window.
+
+Counters go to the unified log. Read them with `log show --last 1h --predicate 'subsystem == "com.hazel.clawd-back"'`.
 
 ## Project layout
 
@@ -177,6 +197,8 @@ Sources/
   Application.swift        # app protocols, window/tab targets, app selection
   Ghostty/                 # window/tab capture + focus via its AppleScript dictionary
   Accessibility/           # same, by window title via System Events (`generic`)
+  WindowServer/            # cross-Space window raise via private SkyLight calls
+  Counters.swift           # claw-back counters, emitted to the unified log
   Multiplexer.swift        # zellij: pane target, focus, attach/focus probes
   StateStore.swift         # ~/.cache/clawd-back/<id>.json
   Config.swift             # app-selection config (TOML/JSON)

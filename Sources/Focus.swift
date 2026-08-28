@@ -7,6 +7,10 @@ import Foundation
 // the steps from a detached shell that waits out our quit makes the focus stick.
 struct FocusPlan {
   private(set) var steps: [String] = []
+  // The in-process WindowServer raise, which cannot ride in `steps`: it needs a
+  // ProcessSerialNumber and private SkyLight calls no shell exposes. Nil when
+  // there is no window id to raise, or the gate is closed.
+  var raise: RaiseRequest?
 
   mutating func add(_ step: String) { steps.append(step) }
   mutating func add(_ more: [String]) { steps += more }
@@ -38,7 +42,7 @@ func isViewing(
   guard term.isFrontmost else { return false }
   var confirmed = false
   if let wf = term as? WindowFocus, let target = terminalTarget {
-    guard wf.frontTarget() == target else { return false }
+    guard wf.frontTarget()?.isSameWindow(as: target) == true else { return false }
     confirmed = true
   }
   if let target = multiplexerTarget {
@@ -56,17 +60,29 @@ func isViewing(
 // is a session-state change with no OS-focus effect, so it goes first; the
 // terminal window raise goes LAST so nothing steals the window back afterward
 // (an earlier ordering ran the pane focus last and the window lost frontmost).
+//
+// `raise` is the exception to the run-after-quit rule: private in-process
+// calls, performed before the quit, with these steps landing on top.
+// `raiseSupported` answers for the build, not the machine: the OS and symbol
+// checks live in the raise, which sends a caller back here on failure.
 func focusPlan(
   term: any AppActivation,
   terminalTarget: WindowFocusTarget?,
   multiplexerTarget: MultiplexerFocusTarget?,
-  resolveMultiplexer: (MultiplexerKind) -> any MultiplexerFocus = multiplexer(for:)
+  resolveMultiplexer: (MultiplexerKind) -> any MultiplexerFocus = multiplexer(for:),
+  raiseSupported: Bool = architectureSupported
 ) -> FocusPlan {
   var plan = FocusPlan()
   let hasTerminal = terminalTarget != nil && term is WindowFocus
   // Nothing to focus (e.g. an un-captured session): empty plan, so a stray
   // notification can't clobber a correct focus from another one.
   guard hasTerminal || multiplexerTarget != nil else { return plan }
+
+  if hasTerminal, raiseSupported, let window = terminalTarget?.cgWindowId,
+    let pid = term.pid
+  {
+    plan.raise = RaiseRequest(pid: pid, window: window)
+  }
 
   // Wait out this app's self-terminate so the focus lands after we've quit and
   // the terminal has settled (otherwise our quit resets the tab). A fixed sleep
@@ -83,12 +99,16 @@ func focusPlan(
   // raise and steal focus back, e.g. to another display's window. Activate only
   // when no window raise will run (baseline terminals, or a mux-only target).
   if let wf = term as? WindowFocus, let target = terminalTarget {
-    plan.add(wf.focusSteps(for: target))
+    let raised = plan.raise != nil
+    plan.add(wf.focusSteps(for: target, raised: raised))
     // Re-assert once: macOS reactivates the prior front app as we quit, which can
     // steal the window back right after the first raise. `select tab` + `focus`
     // are idempotent, so a second pass is a no-op when the first already won.
-    plan.add("sleep 0.15")
-    plan.add(wf.focusSteps(for: target))
+    // A WindowServer raise fronts the window id itself, so it needs no re-assert.
+    if !raised {
+      plan.add("sleep 0.15")
+      plan.add(wf.focusSteps(for: target, raised: false))
+    }
   } else {
     plan.add(term.activationStep())
   }
