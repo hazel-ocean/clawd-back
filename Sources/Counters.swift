@@ -7,6 +7,10 @@ import os
 private let counterLog = Logger(subsystem: "com.hazel.clawd-back", category: "counters")
 
 enum Counter: String {
+  case clickHandled
+  // The launch backstop with nothing handled: the signature of a click handler
+  // that would otherwise have run forever.
+  case launchWithoutResponse
   case raiseAttempted
   case raiseSucceeded
   case raiseFailed
@@ -18,5 +22,7 @@ enum Counter: String {
 }
 
 func counter(_ event: Counter) {
-  counterLog.info("\(event.rawValue, privacy: .public)")
+  // notice, not info: info is memory-only, so a counter written on a path that
+  // hangs is exactly the one `log show` cannot give back.
+  counterLog.notice("\(event.rawValue, privacy: .public)")
 }

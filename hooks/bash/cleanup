@@ -8,4 +8,4 @@ app="$HOME/Applications/ClawdBack.app"
 sid=$(printf '%s' "$payload" | /usr/bin/plutil -extract session_id raw -o - - 2>/dev/null || true)
 [ -n "$sid" ] || exit 0
 
-open "$app" --args cleanup --session-id "$sid"
+open -gn "$app" --args cleanup --session-id "$sid"

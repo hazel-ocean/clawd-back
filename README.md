@@ -161,12 +161,12 @@ requirement stand.
 ## How it works
 
 ```
-SessionStart   -->  open ClawdBack.app --args capture --session-id <id>
+SessionStart   -->  open -gn ClawdBack.app --args capture --session-id <id>
 UserPromptSubmit    saves window_id + tab_id (+ zellij session/pane)
                     to ~/.cache/clawd-back/<id>.json (dropping dead targets)
                     removes this session's delivered notification
 
-Stop / Notify  -->  open ClawdBack.app --args notify --session-id <id> ...
+Stop / Notify  -->  open -gn ClawdBack.app --args notify --session-id <id> ...
                     removes the notifications of every window/pane you view now
                     already viewing that window? -> skip
                     else show notification, keyed session:<id>
@@ -176,11 +176,13 @@ click          -->  open -b <terminal>   (bring to front, cross-app)
                     select saved window + tab
                     zellij: action focus-pane-id terminal_<pane>
 
-SessionEnd     -->  open ClawdBack.app --args cleanup --session-id <id>
+SessionEnd     -->  open -gn ClawdBack.app --args cleanup --session-id <id>
                     removes ~/.cache/clawd-back/<id>.json
 ```
 
 Targeting is by the saved OS window id captured at `SessionStart`, so it is exact regardless of what is frontmost when a notification fires. Ghostty implements window/tab capture + select via its own AppleScript dictionary; `generic` implements window capture + raise via System Events/Accessibility (title-based, best-effort); the other named terminals fall back to activating the app (+ `focus-pane-id`). Both window-addressing paths also save the WindowServer id of the window, which is what carries focus across Spaces and into a full-screen window.
+
+Each mode is launched with `open -gn`: `-n` because `open --args` against an already-running instance delivers nothing and only activates it, and `-g` because a notifier with no window has no business taking focus.
 
 Counters go to the unified log. Read them with `log show --last 1h --predicate 'subsystem == "com.hazel.clawd-back"'`.
 

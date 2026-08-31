@@ -37,5 +37,5 @@ let title = (if ($workspace | is-empty) { $reason } else { $"[($workspace)] ($re
 let body = (if ($last_said | str trim | is-empty) { "Click to go check on Clawd" } else { $last_said })
 
 if ($app | path exists) {
-  ^open $app --args notify --title $title --message $body --session-id $session_id --cwd $cwd
+  ^open -gn $app --args notify --title $title --message $body --session-id $session_id --cwd $cwd
 }

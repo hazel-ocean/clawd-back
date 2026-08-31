@@ -52,7 +52,7 @@ install: sign
     @echo "Installed: {{install_dir}}/{{bundle_name}}"
     @echo ""
     @echo "Usage:"
-    @echo "  open {{install_dir}}/{{bundle_name}} --args notify --message 'Your message' --title 'Title'"
+    @echo "  open -gn {{install_dir}}/{{bundle_name}} --args notify --message 'Your message' --title 'Title'"
 
 uninstall:
     @echo "Removing {{install_dir}}/{{bundle_name}}..."
@@ -61,7 +61,7 @@ uninstall:
 
 test-notify: install
     @echo "Sending test notification..."
-    env -u ZELLIJ_SESSION_NAME -u ZELLIJ_PANE_ID open {{install_dir}}/{{bundle_name}} --args notify --message "Test notification from Clawd Back" --title "Test"
+    env -u ZELLIJ_SESSION_NAME -u ZELLIJ_PANE_ID open -gn {{install_dir}}/{{bundle_name}} --args notify --message "Test notification from Clawd Back" --title "Test"
 
 # List available code signing identities.
 list-identities:

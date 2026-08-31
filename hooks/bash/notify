@@ -36,4 +36,4 @@ if [ -n "$transcript" ] && [ -f "$transcript" ] && command -v jq >/dev/null 2>&1
 fi
 body=${said:-"Click to go check on Clawd"}
 
-open "$app" --args notify --title "$title" --message "$body" --session-id "$sid" --cwd "$cwd"
+open -gn "$app" --args notify --title "$title" --message "$body" --session-id "$sid" --cwd "$cwd"

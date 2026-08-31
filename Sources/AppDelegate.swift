@@ -13,6 +13,23 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
     {
       handleNotificationResponse(response)
     }
+    armLaunchBackstop()
+  }
+
+  // Every path here quits within 300ms, so anything still alive at two seconds
+  // is stuck. A stuck instance is worse than a lost claw-back: `open --args`
+  // against a running app delivers nothing and only activates it, so one of
+  // these silently disables every later notification and steals key focus from
+  // the terminal on each attempt. Unconditional, because the failure mode is a
+  // path that believes it has finished; a path needing longer must say so.
+  private func armLaunchBackstop() {
+    Task {
+      try? await Task.sleep(for: .seconds(2))
+      await MainActor.run {
+        if !handled { counter(.launchWithoutResponse) }
+        NSApplication.shared.terminate(nil)
+      }
+    }
   }
 
   func userNotificationCenter(
@@ -34,6 +51,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
   private func handleNotificationResponse(_ response: UNNotificationResponse) {
     guard !handled else { return }
     handled = true
+    counter(.clickHandled)
 
     guard response.actionIdentifier == UNNotificationDefaultActionIdentifier else {
       terminateApp()
