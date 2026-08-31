@@ -27,12 +27,11 @@ struct AccessibilityApp: WindowFocus {
     return WindowFocusTarget(window: title, tab: nil, cgWindowId: frontWindowId(pid: pid))
   }
 
-  func windowExists(_ target: WindowFocusTarget) -> Bool {
-    if let id = target.cgWindowId { return windowIdExists(id) }
+  func windowStillOpen(_ window: String) -> Bool {
     guard
       let pid,
       let script = bundledResource("Accessibility/ax-window-exists.applescript"),
-      let out = runProcess("/usr/bin/osascript", [script, String(pid), target.window])
+      let out = runProcess("/usr/bin/osascript", [script, String(pid), window])
     else { return false }
     return out == "true"
   }

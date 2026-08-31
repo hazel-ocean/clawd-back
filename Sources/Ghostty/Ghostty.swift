@@ -20,11 +20,10 @@ struct Ghostty: WindowFocus {
       window: p[0], tab: p[1], cgWindowId: pid.flatMap { frontWindowId(pid: $0) })
   }
 
-  func windowExists(_ target: WindowFocusTarget) -> Bool {
-    if let id = target.cgWindowId { return windowIdExists(id) }
+  func windowStillOpen(_ window: String) -> Bool {
     guard
       let script = bundledResource("Ghostty/ghostty-window-exists.applescript"),
-      let out = runProcess("/usr/bin/osascript", [script, target.window])
+      let out = runProcess("/usr/bin/osascript", [script, window])
     else { return false }
     return out == "true"
   }

@@ -2,7 +2,8 @@ import CoreGraphics
 import Foundation
 import AppKit
 
-// A value on FocusPlan, so the plan stays pure and the AppDelegate performs it.
+// Resolved by `raiseRequest` before the plan is built, so the plan stays a list
+// of shell steps and the AppDelegate performs the in-process part.
 struct RaiseRequest: Equatable {
   let pid: pid_t
   let window: CGWindowID
@@ -12,13 +13,15 @@ struct RaiseRequest: Equatable {
 // stays in the detached shell, where Ghostty's `select tab` and the generic
 // path's AXRaise already do it: performing it here needs an AXUIElement, which
 // has no lookup from a window id and would drag in a brute-force search and a
-// cache. False sends the caller back to the shell plan.
-@discardableResult
-func raiseWindow(_ request: RaiseRequest, forceEnabled: Bool) -> Bool {
+// cache. False means the plan must carry its own activation: nil request (there
+// was nothing to raise), a shut gate, or a step that failed.
+func raiseWindow(_ request: RaiseRequest?, forceEnabled: Bool) -> Bool {
+  guard let request else { return false }
   counter(.raiseAttempted)
-  guard let sky = SkyLight.load(forceEnabled: forceEnabled) else { return false }
-  guard var psn = sky.processSerialNumber(for: request.pid) else {
-    counter(.raiseFailed)
+  guard let sky = SkyLight.load(forceEnabled: forceEnabled),
+    var psn = sky.processSerialNumber(for: request.pid)
+  else {
+    counter(.fellBackToShellPlan)
     return false
   }
 
@@ -27,6 +30,7 @@ func raiseWindow(_ request: RaiseRequest, forceEnabled: Bool) -> Bool {
 
   guard sky.front(&psn, window: request.window) else {
     counter(.raiseFailed)
+    counter(.fellBackToShellPlan)
     return false
   }
   sky.makeKey(&psn, window: request.window)
@@ -68,9 +72,18 @@ func frontWindowId(pid: pid_t) -> CGWindowID? {
 
 // Answers across Spaces, and does not depend on a title that an app may rewrite
 // as its open document changes.
+//
+// Two traps here, both of which report a live window as closed:
+//   * `kCGWindowListOptionIncludingWindow` is intersected with on-screen. A
+//     background tab of a native macOS tab group is ordered out, so it answers
+//     empty, and a waiting claw-back targets exactly such a tab.
+//   * the array holds window ids cast to pointers, NOT CFNumbers. NSNumbers
+//     silently match nothing.
 func windowIdExists(_ window: CGWindowID) -> Bool {
-  guard let info = CGWindowListCopyWindowInfo([.optionIncludingWindow], window)
-    as? [[String: Any]]
+  guard let id = UnsafeRawPointer(bitPattern: UInt(window)) else { return false }
+  var ids: [UnsafeRawPointer?] = [id]
+  guard let array = CFArrayCreate(nil, &ids, 1, nil),
+    let info = CGWindowListCreateDescriptionFromArray(array) as? [[String: Any]]
   else { return false }
   return !info.isEmpty
 }

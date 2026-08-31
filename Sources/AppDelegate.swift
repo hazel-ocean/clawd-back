@@ -64,26 +64,25 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
     switch resolveFocus(
       term: term, terminalTarget: state.terminal, multiplexerTarget: state.multiplexer)
     {
-    case .focus(let plan):
+    case .reachable:
+      // The raise runs first, in this process, because the plan's steps are shell
+      // and these are private in-process calls. The plan is then built from what
+      // actually happened, so it carries an activation only when it must.
+      let raised = raiseWindow(
+        raiseRequest(term: term, target: state.terminal),
+        forceEnabled: forceWindowServerRaiseEnabled())
+
       // Raise the saved window, select its tab, and in a multiplexer switch the
       // session to Claude's pane.
-      guard let raise = plan.raise else {
-        plan.runDetached()
+      focusPlan(
+        term: term, terminalTarget: state.terminal, multiplexerTarget: state.multiplexer,
+        raised: raised
+      ).runDetached()
+
+      guard raised else {
         terminateApp()
         return
       }
-      // A failed raise leaves the plan short of the activation its steps would
-      // otherwise carry, so rebuild it rather than run a half plan.
-      guard raiseWindow(raise, forceEnabled: forceWindowServerRaiseEnabled()) else {
-        counter(.fellBackToShellPlan)
-        focusPlan(
-          term: term, terminalTarget: state.terminal, multiplexerTarget: state.multiplexer,
-          raiseSupported: false
-        ).runDetached()
-        terminateApp()
-        return
-      }
-      plan.runDetached()
       // Outlive the Space switch: it is animated, and quitting mid-transition
       // hands focus back to the app macOS reactivates for us.
       Task {
@@ -91,6 +90,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         await MainActor.run { NSApplication.shared.terminate(nil) }
       }
     case .failure(let reason):
+      counter(Counter(reason))
       // One locator per failure. Clicking a locator retries the focus, but a
       // second failure is silent: re-notifying would post a new banner on every
       // click.

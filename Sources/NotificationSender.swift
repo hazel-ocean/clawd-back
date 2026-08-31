@@ -123,6 +123,7 @@ func sendNotification(args: [String]) async {
   if isViewing(
     term: term, terminalTarget: terminalTarget, multiplexerTarget: multiplexerTarget)
   {
+    counter(.notificationSkippedWhileViewing)
     return
   }
 
@@ -137,6 +138,7 @@ func sendNotification(args: [String]) async {
       return
     }
   } else if settings.authorizationStatus == .denied {
+    counter(.notificationNotAuthorized)
     print(
       "Notifications are denied. Please enable in System Settings > Notifications > ClawdBack"
     )
@@ -164,6 +166,7 @@ func sendNotification(args: [String]) async {
 
   do {
     try await center.add(request)
+    counter(.notificationPosted)
     if let sessionId, !sessionId.isEmpty {
       var state =
         saved ?? SessionState(terminal: terminalTarget, multiplexer: multiplexerTarget)

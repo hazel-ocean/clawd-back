@@ -89,14 +89,24 @@ protocol WindowFocus: AppActivation {
   // compare for skip-when-viewing.
   func frontTarget() -> WindowFocusTarget?
 
-  // Does the captured window still exist? False ⇒ claw-back can't land on it.
-  // Takes the whole target so a conformer can prefer the window id.
-  func windowExists(_ target: WindowFocusTarget) -> Bool
+  // Does the window named by `window` still exist? Only consulted for a target
+  // with no WindowServer id, since that id answers the same question across
+  // Spaces and without depending on a title.
+  func windowStillOpen(_ window: String) -> Bool
 
   // Shell steps that raise `target`'s window and select its tab. Under
   // `raised` an activation here is redundant and, being async, can land after
   // the WindowServer raise and steal focus to another Space's window.
   func focusSteps(for target: WindowFocusTarget, raised: Bool) -> [String]
+}
+
+extension WindowFocus {
+  // False ⇒ claw-back can't land on it. One implementation, because the id-first
+  // rule is where the same bug reached a conformer twice.
+  func windowExists(_ target: WindowFocusTarget) -> Bool {
+    guard let id = target.cgWindowId else { return windowStillOpen(target.window) }
+    return windowIdExists(id)
+  }
 }
 
 // An app we can raise but not address by window/tab. Used for the named

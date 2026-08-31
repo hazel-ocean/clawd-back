@@ -9,8 +9,8 @@ enum FocusFailure: Equatable {
 }
 
 // A resolved claw-back is one or the other, never a silent no-op.
-enum FocusOutcome {
-  case focus(FocusPlan)
+enum FocusOutcome: Equatable {
+  case reachable
   case failure(FocusFailure)
 }
 
@@ -39,13 +39,12 @@ enum FocusFailureResponse: String, Codable, CaseIterable {
 }
 
 // A session failure is the more actionable one (we can name the session), so it
-// wins over a gone window. A reachable target yields today's focus plan.
+// wins over a gone window.
 func resolveFocus(
   term: any AppActivation,
   terminalTarget: WindowFocusTarget?,
   multiplexerTarget: MultiplexerFocusTarget?,
-  resolveMultiplexer: (MultiplexerKind) -> any MultiplexerFocus = multiplexer(for:),
-  raiseSupported: Bool = architectureSupported
+  resolveMultiplexer: (MultiplexerKind) -> any MultiplexerFocus = multiplexer(for:)
 ) -> FocusOutcome {
   if let mux = multiplexerTarget {
     switch resolveMultiplexer(mux.kind).sessionState(on: mux) {
@@ -64,10 +63,7 @@ func resolveFocus(
   {
     return .failure(.windowGone)
   }
-  return .focus(
-    focusPlan(
-      term: term, terminalTarget: terminalTarget, multiplexerTarget: multiplexerTarget,
-      resolveMultiplexer: resolveMultiplexer, raiseSupported: raiseSupported))
+  return .reachable
 }
 
 func handleFocusFailure(

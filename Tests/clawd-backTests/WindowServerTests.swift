@@ -12,49 +12,74 @@ private struct FakeWindowApp: WindowFocus {
   var pid: pid_t?
   var bundleIdentifier: String { kind.bundleIdentifier! }
   func frontTarget() -> WindowFocusTarget? { nil }
-  func windowExists(_ target: WindowFocusTarget) -> Bool { true }
+  func windowStillOpen(_ window: String) -> Bool { true }
   // Stands in for the generic conformer, the one that carries an activation.
   func focusSteps(for target: WindowFocusTarget, raised: Bool) -> [String] {
     raised ? ["FOCUS"] : ["ACTIVATE", "FOCUS"]
   }
 }
 
-final class RaisePlanTests: XCTestCase {
+final class RaiseRequestTests: XCTestCase {
   private let raisable = WindowFocusTarget(window: "w1", tab: "t1", cgWindowId: 42)
 
-  func testRaiseReplacesActivationAndReassert() {
-    let term = FakeWindowApp(pid: 7)
+  func testRequestsTheCapturedWindow() {
+    XCTAssertEqual(
+      raiseRequest(term: FakeWindowApp(pid: 7), target: raisable, raiseSupported: true),
+      RaiseRequest(pid: 7, window: 42))
+  }
+
+  func testClosedGateMeansNoRaise() {
+    XCTAssertNil(
+      raiseRequest(term: FakeWindowApp(pid: 7), target: raisable, raiseSupported: false))
+  }
+
+  // A target captured before window ids existed.
+  func testNoWindowIdMeansNoRaise() {
+    XCTAssertNil(
+      raiseRequest(
+        term: FakeWindowApp(pid: 7), target: WindowFocusTarget(window: "w1", tab: "t1"),
+        raiseSupported: true))
+  }
+
+  // The app is no longer running.
+  func testNoProcessMeansNoRaise() {
+    XCTAssertNil(
+      raiseRequest(term: FakeWindowApp(pid: nil), target: raisable, raiseSupported: true))
+  }
+
+  // An app that cannot address windows has nothing to raise, whatever the
+  // target carries.
+  func testBaselineAppMeansNoRaise() {
+    XCTAssertNil(
+      raiseRequest(term: FakeBaselineApp(pid: 7), target: raisable, raiseSupported: true))
+  }
+}
+
+final class RaisedPlanTests: XCTestCase {
+  private let target = WindowFocusTarget(window: "w1", tab: "t1", cgWindowId: 42)
+
+  // A landed raise already fronted the window, so the plan drops the activation
+  // and the re-assert pass.
+  func testRaisedPlanIsJustTheWindowSteps() {
     let plan = focusPlan(
-      term: term, terminalTarget: raisable, multiplexerTarget: nil, raiseSupported: true)
-    XCTAssertEqual(plan.raise, RaiseRequest(pid: 7, window: 42))
+      term: FakeWindowApp(pid: 7), terminalTarget: target, multiplexerTarget: nil,
+      raised: true)
     XCTAssertEqual(plan.steps, waitForQuit + ["FOCUS"])
   }
 
-  func testClosedGateKeepsTheShellPlan() {
-    let term = FakeWindowApp(pid: 7)
+  func testUnraisedPlanActivatesAndReasserts() {
     let plan = focusPlan(
-      term: term, terminalTarget: raisable, multiplexerTarget: nil, raiseSupported: false)
-    XCTAssertNil(plan.raise)
+      term: FakeWindowApp(pid: 7), terminalTarget: target, multiplexerTarget: nil,
+      raised: false)
     XCTAssertEqual(
       plan.steps, waitForQuit + ["ACTIVATE", "FOCUS", "sleep 0.15", "ACTIVATE", "FOCUS"])
   }
+}
 
-  // A target captured before window ids existed, or an app that is no longer
-  // running: same fallback as a closed gate.
-  func testNoWindowIdMeansNoRaise() {
-    let term = FakeWindowApp(pid: 7)
-    let plan = focusPlan(
-      term: term, terminalTarget: WindowFocusTarget(window: "w1", tab: "t1"),
-      multiplexerTarget: nil, raiseSupported: true)
-    XCTAssertNil(plan.raise)
-  }
-
-  func testNoProcessMeansNoRaise() {
-    let term = FakeWindowApp(pid: nil)
-    let plan = focusPlan(
-      term: term, terminalTarget: raisable, multiplexerTarget: nil, raiseSupported: true)
-    XCTAssertNil(plan.raise)
-  }
+private struct FakeBaselineApp: AppActivation {
+  let kind = Application.rio
+  var pid: pid_t?
+  var bundleIdentifier: String { kind.bundleIdentifier! }
 }
 
 final class SkyLightGateTests: XCTestCase {

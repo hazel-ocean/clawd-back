@@ -19,6 +19,25 @@ enum Counter: String {
   case gateClosedByMissingSymbol
   case targetOffSpace
   case fellBackToShellPlan
+  // Why a click could not land. A locator notification says this to the user;
+  // without a counter it says nothing to whoever debugs it later.
+  case focusFailedWindowGone
+  case focusFailedSessionDetached
+  case focusFailedSessionMissing
+  case notificationPosted
+  case notificationSkippedWhileViewing
+  case notificationNotAuthorized
+  case unknownMode
+}
+
+extension Counter {
+  init(_ failure: FocusFailure) {
+    switch failure {
+    case .windowGone: self = .focusFailedWindowGone
+    case .sessionDetached: self = .focusFailedSessionDetached
+    case .sessionMissing: self = .focusFailedSessionMissing
+    }
+  }
 }
 
 func counter(_ event: Counter) {
