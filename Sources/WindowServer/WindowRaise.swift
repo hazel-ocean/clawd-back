@@ -43,14 +43,26 @@ func raiseWindow(_ request: RaiseRequest?, forceEnabled: Bool) -> Bool {
 private func originToRepair(
   _ sky: SkyLight, request: RaiseRequest
 ) -> (space: CGSSpaceID, pid: pid_t)? {
-  guard let current = sky.currentSpace() else { return nil }
-  let target = sky.spaces(of: request.window)
-  guard !target.isEmpty, !target.contains(current) else { return nil }
+  guard isOffSpace(target: sky.spaces(of: request.window), visible: sky.visibleSpaces())
+  else { return nil }
   counter(.targetOffSpace)
-  guard let front = NSWorkspace.shared.frontmostApplication?.processIdentifier,
+  guard let current = sky.currentSpace(),
+    let front = NSWorkspace.shared.frontmostApplication?.processIdentifier,
     front != request.pid
   else { return nil }
   return (current, front)
+}
+
+// Every display shows a Space, so a window is only somewhere the user cannot
+// see when it is on none of them. Judging against the active display alone
+// calls a window on the second display off-Space, and the repair then re-fronts
+// the previous app on a Space we never left, undoing the raise (AltTab #5586).
+//
+// An empty target reads as on-Space: the WindowServer having no answer is not
+// evidence of being elsewhere, and the same repair would fire on a guess.
+func isOffSpace(target: [CGSSpaceID], visible: [CGSSpaceID]) -> Bool {
+  guard !target.isEmpty, !visible.isEmpty else { return false }
+  return target.allSatisfy { !visible.contains($0) }
 }
 
 // Only called at capture time, when the window is frontmost, so the first

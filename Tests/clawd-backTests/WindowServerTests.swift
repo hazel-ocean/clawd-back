@@ -82,6 +82,28 @@ private struct FakeBaselineApp: AppActivation {
   var bundleIdentifier: String { kind.bundleIdentifier! }
 }
 
+final class OffSpaceTests: XCTestCase {
+  func testOnAnotherSpaceIsOffSpace() {
+    XCTAssertTrue(isOffSpace(target: [833], visible: [750, 792]))
+  }
+
+  func testTheActiveDisplaysSpaceIsNotOffSpace() {
+    XCTAssertFalse(isOffSpace(target: [750], visible: [750, 792]))
+  }
+
+  // The case a single-display test misses: visible on the second display, so
+  // repairing would undo a raise we never needed to repair.
+  func testASecondDisplaysSpaceIsNotOffSpace() {
+    XCTAssertFalse(isOffSpace(target: [792], visible: [750, 792]))
+  }
+
+  // Unknown is not elsewhere.
+  func testNoAnswerIsNotOffSpace() {
+    XCTAssertFalse(isOffSpace(target: [], visible: [750, 792]))
+    XCTAssertFalse(isOffSpace(target: [833], visible: []))
+  }
+}
+
 final class SkyLightGateTests: XCTestCase {
   private func version(_ major: Int, _ minor: Int = 0) -> OperatingSystemVersion {
     OperatingSystemVersion(majorVersion: major, minorVersion: minor, patchVersion: 0)

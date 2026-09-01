@@ -178,6 +178,36 @@ final class ResolveFocusTests: XCTestCase {
   }
 }
 
+final class RecaptureTests: XCTestCase {
+  private let saved = WindowFocusTarget(window: "w1", tab: "t1", cgWindowId: 42)
+
+  private func term(front: WindowFocusTarget?) -> FakeWindowTerminal {
+    FakeWindowTerminal(kind: .ghostty, isFrontmost: true, front: front, steps: ["SELECT"])
+  }
+
+  // A read from another Space sees no window id; the saved one is still good.
+  func testKeepsTheSavedWindowIdWhenTheReadHasNone() {
+    let fresh = WindowFocusTarget(window: "w1", tab: "t1")
+    let result = recapturedTerminal(
+      term: term(front: fresh), existing: saved, multiplexer: nil)
+    XCTAssertEqual(result?.cgWindowId, 42)
+  }
+
+  func testDoesNotBorrowAnIdFromADifferentWindow() {
+    let fresh = WindowFocusTarget(window: "w2", tab: "t1")
+    let result = recapturedTerminal(
+      term: term(front: fresh), existing: saved, multiplexer: nil)
+    XCTAssertNil(result?.cgWindowId)
+  }
+
+  func testAFreshIdWins() {
+    let fresh = WindowFocusTarget(window: "w1", tab: "t1", cgWindowId: 99)
+    let result = recapturedTerminal(
+      term: term(front: fresh), existing: saved, multiplexer: nil)
+    XCTAssertEqual(result?.cgWindowId, 99)
+  }
+}
+
 final class FocusPayloadTests: XCTestCase {
   private let winTarget = WindowFocusTarget(window: "w1", tab: "t1")
   private let muxTarget = MultiplexerFocusTarget(kind: .zellij, session: "main", pane: "3")

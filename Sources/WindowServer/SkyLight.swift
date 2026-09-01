@@ -39,6 +39,8 @@ private typealias CopySpacesForWindowsFn =
   @convention(c) (CGSConnectionID, Int, CFArray) -> Unmanaged<CFArray>?
 private typealias CopyActiveMenuBarDisplayFn =
   @convention(c) (CGSConnectionID) -> Unmanaged<CFString>?
+private typealias CopyManagedDisplaySpacesFn =
+  @convention(c) (CGSConnectionID) -> Unmanaged<CFArray>?
 private typealias ManagedDisplayCurrentSpaceFn =
   @convention(c) (CGSConnectionID, CFString) -> CGSSpaceID
 private typealias SpaceSetFrontPSNFn =
@@ -50,6 +52,7 @@ private struct SpaceRepairSymbols {
   let mainConnectionID: MainConnectionIDFn
   let copySpacesForWindows: CopySpacesForWindowsFn
   let copyActiveMenuBarDisplay: CopyActiveMenuBarDisplayFn
+  let copyManagedDisplaySpaces: CopyManagedDisplaySpacesFn
   let managedDisplayCurrentSpace: ManagedDisplayCurrentSpaceFn
   let spaceSetFrontPSN: SpaceSetFrontPSNFn
 
@@ -59,6 +62,8 @@ private struct SpaceRepairSymbols {
       let spaces: CopySpacesForWindowsFn = bind(handle, "SLSCopySpacesForWindows"),
       let display: CopyActiveMenuBarDisplayFn = bind(
         handle, "SLSCopyActiveMenuBarDisplayIdentifier"),
+      let displays: CopyManagedDisplaySpacesFn = bind(
+        handle, "SLSCopyManagedDisplaySpaces"),
       let current: ManagedDisplayCurrentSpaceFn = bind(
         handle, "SLSManagedDisplayGetCurrentSpace"),
       let setFront: SpaceSetFrontPSNFn = bind(handle, "SLSSpaceSetFrontPSN")
@@ -66,6 +71,7 @@ private struct SpaceRepairSymbols {
     mainConnectionID = connection
     copySpacesForWindows = spaces
     copyActiveMenuBarDisplay = display
+    copyManagedDisplaySpaces = displays
     managedDisplayCurrentSpace = current
     spaceSetFrontPSN = setFront
   }
@@ -171,6 +177,19 @@ extension SkyLight {
     let wids = [NSNumber(value: window)] as CFArray
     guard let raw = repair.copySpacesForWindows(cid, cgsSpaceMaskAll, wids) else { return [] }
     return (raw.takeRetainedValue() as? [NSNumber])?.map { $0.uint64Value } ?? []
+  }
+
+  // The Space each display is showing. A second display shows its own, so a
+  // target there is in front of the user even though it is not on the active
+  // display's Space.
+  func visibleSpaces() -> [CGSSpaceID] {
+    guard let repair,
+      let displays = repair.copyManagedDisplaySpaces(repair.mainConnectionID())
+    else { return [] }
+    let raw = displays.takeRetainedValue() as? [NSDictionary] ?? []
+    return raw.compactMap {
+      (($0["Current Space"] as? NSDictionary)?["ManagedSpaceID"] as? NSNumber)?.uint64Value
+    }
   }
 
   func currentSpace() -> CGSSpaceID? {

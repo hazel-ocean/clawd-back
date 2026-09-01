@@ -65,7 +65,14 @@ func recapturedTerminal(
 
   let paneConfirms =
     multiplexer.map { resolveMultiplexer($0.kind).isFocused(on: $0) } ?? false
-  if term.isFrontmost || paneConfirms, let front = wf.frontTarget() {
+  if term.isFrontmost || paneConfirms, var front = wf.frontTarget() {
+    // The on-screen list holds only the current Space, so a read taken from
+    // elsewhere carries no window id, and the pane confirms from anywhere.
+    // Keep the saved id rather than trade a cross-Space raise for a fresh read
+    // of the same window.
+    if front.cgWindowId == nil, let existing, existing.isSameWindow(as: front) {
+      front.cgWindowId = existing.cgWindowId
+    }
     return front
   }
   guard let existing, wf.windowExists(existing) else { return nil }
