@@ -52,3 +52,8 @@ test-notify: sign
 list-identities:
     @echo "Available code signing identities:"
     @security find-identity -v -p codesigning
+
+# Show a log stream of events published by Clawd Back
+logs:
+    clear
+    log stream --predicate 'subsystem == "com.hazel.clawd-back"' --style compact
