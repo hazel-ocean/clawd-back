@@ -32,8 +32,10 @@ struct FocusState: Equatable {
 }
 
 // Configurable reaction to a FocusFailure, decoded from config like Application.
-// Only .notify today; spawn / newTab / switchSession slot in with the config
-// schema (docs/plans/configuration.md).
+// Only .notify today, which moves nothing. Anything that rearranges the
+// workspace, spawning a surface or switching a window's session in place, is a
+// deliberate omission: a click that cannot land should explain itself, not
+// redecorate.
 enum FocusFailureResponse: String, Codable, CaseIterable {
   case notify
 }

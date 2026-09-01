@@ -15,6 +15,10 @@ struct RaiseRequest: Equatable {
 // has no lookup from a window id and would drag in a brute-force search and a
 // cache. False means the plan must carry its own activation: nil request (there
 // was nothing to raise), a shut gate, or a step that failed.
+//
+// A minimized target is not restored. Fronting it leaves it in the Dock, so the
+// claw-back lands on nothing visible; clearing kAXMinimizedAttribute first is
+// the fix if that ever comes up.
 func raiseWindow(_ request: RaiseRequest?, forceEnabled: Bool) -> Bool {
   guard let request else { return false }
   counter(.raiseAttempted)
