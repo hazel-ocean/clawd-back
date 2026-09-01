@@ -84,9 +84,18 @@ func isOffSpace(target: [CGSSpaceID], visible: [CGSSpaceID]) -> Bool {
   return target.allSatisfy { !visible.contains($0) }
 }
 
-// Only called at capture time, when the window is frontmost, so the first
-// on-screen match at layer 0 is the right one.
+// The window and tab ids come from the app's own AppleScript, this comes from
+// the on-screen list, and the two only name the same window while the app is
+// frontmost. A multiplexer pane confirms a capture from anywhere, so without
+// this guard a capture taken from another Space pairs the front window's tab
+// with whichever window of the app happens to be on screen, and the claw-back
+// raises the wrong one. No id is the safe answer: the caller keeps the one it
+// already has, or the plan falls back to activating the app.
 func frontWindowId(pid: pid_t) -> CGWindowID? {
+  guard NSWorkspace.shared.frontmostApplication?.processIdentifier == pid else {
+    counter(.windowIdUnavailable)
+    return nil
+  }
   guard
     let windows = CGWindowListCopyWindowInfo(.optionOnScreenOnly, kCGNullWindowID)
       as? [[String: Any]]
