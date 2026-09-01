@@ -24,7 +24,7 @@ struct AccessibilityApp: WindowFocus {
       let title = runProcess("/usr/bin/osascript", [script, String(pid)]),
       !title.isEmpty
     else { return nil }
-    return WindowFocusTarget(window: title, tab: nil, cgWindowId: frontWindowId(pid: pid))
+    return WindowFocusTarget(window: title, tab: nil, cgWindowId: focusedWindowId(pid: pid))
   }
 
   func windowStillOpen(_ window: String) -> Bool {

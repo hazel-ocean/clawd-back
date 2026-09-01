@@ -26,10 +26,23 @@ private let axGetWindow: GetWindowFn? = {
 }()
 
 // Reading another app's windows needs Accessibility, so this returns nil until
-// that is granted. What it buys over the on-screen list: an answer for a window
-// on any Space, whether or not its app is frontmost.
+// that is granted, and the claw-back then activates the app the way it always
+// did.
+//
+// There is deliberately no second source. Deriving the id from the on-screen
+// window list looked like a graceful fallback and is not: it can name a
+// different window from the one the app calls front (measured at 20588 against
+// this call's 20587, with the app frontmost and active). A wrong id raises the
+// wrong window with confidence, where no id degrades to activation.
 func focusedWindowId(pid: pid_t) -> CGWindowID? {
-  guard let axGetWindow, AXIsProcessTrusted() else { return nil }
+  guard let axGetWindow else {
+    counter(.windowIdUnavailable)
+    return nil
+  }
+  guard AXIsProcessTrusted() else {
+    counter(.accessibilityNotGranted)
+    return nil
+  }
 
   let app = AXUIElementCreateApplication(pid)
   // A beach-balling app must not stall the capture hook, which runs on every
@@ -41,9 +54,16 @@ func focusedWindowId(pid: pid_t) -> CGWindowID? {
     AXUIElementCopyAttributeValue(app, kAXFocusedWindowAttribute as CFString, &focused)
       == .success,
     let value = focused, CFGetTypeID(value) == AXUIElementGetTypeID()
-  else { return nil }
+  else {
+    counter(.windowIdUnavailable)
+    return nil
+  }
 
   var id = CGWindowID(0)
-  guard axGetWindow(value as! AXUIElement, &id) == .success, id != 0 else { return nil }
+  guard axGetWindow(value as! AXUIElement, &id) == .success, id != 0 else {
+    counter(.windowIdUnavailable)
+    return nil
+  }
+  counter(.windowIdFromAccessibility)
   return id
 }

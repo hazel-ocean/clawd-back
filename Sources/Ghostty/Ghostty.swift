@@ -17,7 +17,7 @@ struct Ghostty: WindowFocus {
     let p = out.components(separatedBy: "\t")
     guard p.count == 2 else { return nil }
     return WindowFocusTarget(
-      window: p[0], tab: p[1], cgWindowId: pid.flatMap { frontWindowId(pid: $0) })
+      window: p[0], tab: p[1], cgWindowId: pid.flatMap { focusedWindowId(pid: $0) })
   }
 
   func windowStillOpen(_ window: String) -> Bool {

@@ -84,36 +84,6 @@ func isOffSpace(target: [CGSSpaceID], visible: [CGSSpaceID]) -> Bool {
   return target.allSatisfy { !visible.contains($0) }
 }
 
-// Accessibility answers exactly, so it goes first. The on-screen list is the
-// fallback, and it only names the app's front window while that app is
-// frontmost: the window and tab ids come from the app's own scripting, and a
-// multiplexer pane confirms a capture from anywhere, so without the guard a
-// capture taken from another Space pairs the front window's tab with whichever
-// window happened to be on screen, and the claw-back raises that one. No id is
-// the safe answer: the caller keeps the id it has, or the plan activates the app.
-func frontWindowId(pid: pid_t) -> CGWindowID? {
-  if let id = focusedWindowId(pid: pid) {
-    counter(.windowIdFromAccessibility)
-    return id
-  }
-  guard NSWorkspace.shared.frontmostApplication?.processIdentifier == pid else {
-    counter(.windowIdUnavailable)
-    return nil
-  }
-  guard
-    let windows = CGWindowListCopyWindowInfo(.optionOnScreenOnly, kCGNullWindowID)
-      as? [[String: Any]]
-  else { return nil }
-  for window in windows {
-    guard window[kCGWindowOwnerPID as String] as? pid_t == pid,
-      window[kCGWindowLayer as String] as? Int == 0,
-      let id = window[kCGWindowNumber as String] as? CGWindowID
-    else { continue }
-    return id
-  }
-  return nil
-}
-
 // Answers across Spaces, and does not depend on a title that an app may rewrite
 // as its open document changes.
 //

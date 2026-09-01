@@ -60,7 +60,7 @@ To sign with a Developer ID: `just sign signing_identity="Apple Development: You
 
 > First time you click a notification, macOS asks for permission to control Ghostty (Automation). Grant it. An ad-hoc re-sign on rebuild can reset that grant; the app still comes to the front regardless, only the tab-select needs it.
 >
-> **Accessibility** (System Settings → Privacy & Security → Accessibility) is a second, distinct permission, and it is worth granting for any app. It is how ClawdBack identifies the exact window your session lives in, which is what lets a claw-back cross a Space or enter a full-screen window. Without it, the window is identified from what is currently on screen, which is only reliable while the terminal is frontmost.
+> **Accessibility** (System Settings → Privacy & Security → Accessibility) is a second, distinct permission, and the cross-Space raise needs it. It is how ClawdBack identifies the exact window your session lives in, which is what lets a claw-back cross a Space or enter a full-screen window. Without it a claw-back still activates the app and selects the tab, it just cannot travel to another Space.
 >
 > For `application = "generic"` (see [Configuration](#configuration)) it is required rather than advisable, since raising that app's window goes through System Events. Without it, ClawdBack still activates the app via `open -b`, just without raising the specific window.
 
