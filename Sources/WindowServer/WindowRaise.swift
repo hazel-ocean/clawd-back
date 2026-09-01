@@ -35,9 +35,28 @@ func raiseWindow(_ request: RaiseRequest?, forceEnabled: Bool) -> Bool {
   }
   sky.makeKey(&psn, window: request.window)
   if let origin { sky.restoreFront(of: origin.space, to: origin.pid) }
+  activate(pid: request.pid)
 
   counter(.raiseSucceeded)
   return true
+}
+
+// The WindowServer front routes keys to the window, but leaves AppKit calling
+// the app we were launched from active. The terminal then draws an unfocused
+// cursor, and our quit hands activation straight back to that app. Yielding is
+// how an active app passes activation on, and we are the active app here,
+// which is the only position it is reliably granted from.
+//
+// Runs last: it is an AppKit request, and the public activation belongs after
+// the WindowServer front, never before, or the Space switch is lost.
+private func activate(pid: pid_t) {
+  guard let app = NSRunningApplication(processIdentifier: pid) else { return }
+  if #available(macOS 14.0, *) {
+    NSApplication.shared.yieldActivation(to: app)
+    app.activate()
+  } else {
+    app.activate(options: [])
+  }
 }
 
 private func originToRepair(
