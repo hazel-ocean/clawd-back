@@ -110,7 +110,7 @@ The spawn-related dictionary verbs (`new surface configuration`, `new tab in (wi
 
 ## Verification (end-to-end, after implementation)
 1. `just build` and `swift test`.
-2. `just install`; confirm `ghostty-window-exists.applescript` lands in `Contents/Resources/Ghostty/`.
+2. `just bundle`; confirm `ghostty-window-exists.applescript` lands in `Contents/Resources/Ghostty/`.
 3. Manual, in Ghostty + Zellij:
    - Attach session A in a window, start Claude, submit a prompt (capture). Detach A. Trigger a Stop/Notification. Click -> a second notification says session A is detached and shows `zellij attach A`.
    - Close the captured window entirely, then click -> a second notification says the window is gone (and, if the session is still attached, names it).

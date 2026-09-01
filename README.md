@@ -49,10 +49,14 @@ The flake exposes `packages.default` (an `.app` under `$out/Applications`). Inst
 ```bash
 git clone https://github.com/hazel-ocean/clawd-back
 cd clawd-back
-just install   # builds, bundles, signs, installs to ~/Applications/ClawdBack.app
+just sign   # builds, bundles, and ad-hoc signs ClawdBack.app in this directory
 ```
 
-By default the app is ad-hoc signed. To use a Developer ID: `just install signing_identity="Apple Development: You (XXXXXXXXXX)"`.
+Copy the bundle somewhere LaunchServices can find it, such as `~/Applications`.
+There is no install recipe: where the app lives is the packaging's business, and
+the Nix flake and the Homebrew cask each answer it their own way.
+
+To sign with a Developer ID: `just sign signing_identity="Apple Development: You (XXXXXXXXXX)"`.
 
 > First time you click a notification, macOS asks for permission to control Ghostty (Automation). Grant it. An ad-hoc re-sign on rebuild can reset that grant; the app still comes to the front regardless, only the tab-select needs it.
 >
@@ -104,7 +108,7 @@ Nushell (swap `bash` for `nushell`):
 }
 ```
 
-Use whatever path the app actually lives at, `~/Applications/...` if you installed there via `just install`.
+Use whatever path the app actually lives at, `~/Applications/...` for a local copy.
 
 > **Nix users:** the flake installs the app under `~/Applications` (a `/nix/store` path rotates on rebuild). Rather than chase the bundle path, generate your own wrappers with `pkgs.writeScript` and point the hooks at their stable `~/.claude/hooks/...` symlinks. The [`hooks/nushell/`](hooks/nushell/) scripts are a ready template.
 

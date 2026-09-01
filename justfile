@@ -1,10 +1,9 @@
 app_name := "ClawdBack"
 bundle_name := app_name + ".app"
-install_dir := env_var('HOME') / "Applications"
 executable_name := "clawd-back"
 
 # Code signing identity: "-" for ad-hoc, or your Developer ID.
-# Override: just install signing_identity="Apple Development: You (XXXXXXXXXX)"
+# Override: just sign signing_identity="Apple Development: You (XXXXXXXXXX)"
 # Find yours: security find-identity -v -p codesigning
 signing_identity := "-"
 
@@ -44,24 +43,10 @@ sign: bundle
     codesign --verify --verbose {{bundle_name}}
     @echo "Code signing complete."
 
-install: sign
-    @echo "Installing to {{install_dir}}..."
-    @mkdir -p {{install_dir}}
-    @rm -rf {{install_dir}}/{{bundle_name}}
-    @cp -r {{bundle_name}} {{install_dir}}/
-    @echo "Installed: {{install_dir}}/{{bundle_name}}"
-    @echo ""
-    @echo "Usage:"
-    @echo "  open -gn {{install_dir}}/{{bundle_name}} --args notify --message 'Your message' --title 'Title'"
-
-uninstall:
-    @echo "Removing {{install_dir}}/{{bundle_name}}..."
-    @rm -rf {{install_dir}}/{{bundle_name}}
-    @echo "Uninstalled."
-
-test-notify: install
+# Notify from the bundle in this directory; an unsigned one is refused.
+test-notify: sign
     @echo "Sending test notification..."
-    env -u ZELLIJ_SESSION_NAME -u ZELLIJ_PANE_ID open -gn {{install_dir}}/{{bundle_name}} --args notify --message "Test notification from Clawd Back" --title "Test"
+    env -u ZELLIJ_SESSION_NAME -u ZELLIJ_PANE_ID open -gn {{bundle_name}} --args notify --message "Test notification from Clawd Back" --title "Test"
 
 # List available code signing identities.
 list-identities:
