@@ -28,6 +28,7 @@ enum Counter: String {
   case notificationSkippedWhileViewing
   case notificationNotAuthorized
   case unknownMode
+  case windowIdFromAccessibility
   // A capture that could not pair a window id with the app's front window.
   case windowIdUnavailable
 }
