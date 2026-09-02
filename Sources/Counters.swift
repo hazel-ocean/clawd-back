@@ -27,6 +27,7 @@ enum Counter: String {
   case notificationPosted
   case notificationSkippedWhileViewing
   case notificationNotAuthorized
+  case soundUnavailable
   case unknownMode
   case windowIdFromAccessibility
   case accessibilityNotGranted

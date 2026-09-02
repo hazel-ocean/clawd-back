@@ -1,16 +1,29 @@
+import AppKit
 import Foundation
 import UserNotifications
 
-// A claw-back should be recognisable as this app rather than as whatever the
-// user set for system beeps, so the sound is named rather than `.default`.
-// Checked once: a name that resolves to nothing yields a silent notification,
-// which is worse than an unexpected one.
-let clawBackSound: UNNotificationSound = {
-  let name = "Pop.aiff"
-  guard FileManager.default.fileExists(atPath: "/System/Library/Sounds/\(name)")
-  else { return .default }
-  return UNNotificationSound(named: UNNotificationSoundName(name))
-}()
+// Named rather than `.default`, so a claw-back is recognisable as this app and
+// not as whatever the user set for system beeps.
+//
+// NSSound resolves the same search path UNNotificationSound uses, the app
+// bundle then the Library/Sounds directories, and it is case sensitive. So it
+// answers the question that matters about a configured name: will it actually
+// play. One that resolves to nothing posts a silent notification, which is
+// worse than an unexpected sound.
+let defaultSoundName = "Pop"
+
+func clawBackSound() -> UNNotificationSound {
+  let configured = loadConfig()?.sound ?? defaultSoundName
+  guard NSSound(named: configured) != nil else {
+    counter(.soundUnavailable)
+    return .default
+  }
+  // The system set is all .aiff; a name carrying its own extension is somebody's
+  // own file and is left alone.
+  let file = (configured as NSString).pathExtension.isEmpty
+    ? "\(configured).aiff" : configured
+  return UNNotificationSound(named: UNNotificationSoundName(file))
+}
 
 // A random crab icon from the bundled Resources/Crabs, copied to a fresh temp
 // URL so UNNotificationAttachment can take ownership without moving the
@@ -166,7 +179,7 @@ func sendNotification(args: [String]) async {
   let content = UNMutableNotificationContent()
   content.title = title
   content.body = message
-  content.sound = clawBackSound
+  content.sound = clawBackSound()
   // Break through Focus modes (needs the time-sensitive entitlement + signing).
   content.interruptionLevel = .timeSensitive
   content.userInfo = FocusPayload.userInfo(

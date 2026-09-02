@@ -9,6 +9,9 @@ struct AppConfig: Codable {
   // Lifts the WindowServer gate's macOS ceiling only. The floor and the Apple
   // Silicon requirement stand.
   let forceWindowServerRaiseEnabled: Bool?
+  // Notification sound, by name, from the app bundle or any Library/Sounds
+  // directory. Case sensitive, and the extension is optional for the system set.
+  let sound: String?
 }
 
 func forceWindowServerRaiseEnabled() -> Bool {

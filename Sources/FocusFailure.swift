@@ -134,7 +134,7 @@ private func sendLocatorNotification(_ failure: FocusFailure, state: FocusState)
   let content = UNMutableNotificationContent()
   content.title = title
   content.body = body
-  content.sound = clawBackSound
+  content.sound = clawBackSound()
   content.interruptionLevel = .timeSensitive
   // Same identity and payload as the banner this replaces: one live notification
   // per session, dismissible by the next prompt and by skip-when-viewing.

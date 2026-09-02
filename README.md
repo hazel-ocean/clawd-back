@@ -132,6 +132,18 @@ application = "ghostty"  # ghostty | wezterm | iterm2 | terminal | alacritty | k
 
 Defaults to `ghostty` if no config exists.
 
+The notification sound is `Pop`, and any sound in the app bundle or a
+`Library/Sounds` directory can replace it by name:
+
+```toml
+sound = "Submarine"
+```
+
+Names are case sensitive, and the extension is optional for the system set
+(`/System/Library/Sounds`). A name that does not resolve falls back to your
+system alert sound and logs `soundUnavailable`, so a typo is audible rather than
+silent.
+
 For any app without an AppleScript dictionary (anything other than Ghostty
 that isn't one of the named terminals above), use `generic` with its bundle
 id:
