@@ -1,6 +1,17 @@
 import Foundation
 import UserNotifications
 
+// A claw-back should be recognisable as this app rather than as whatever the
+// user set for system beeps, so the sound is named rather than `.default`.
+// Checked once: a name that resolves to nothing yields a silent notification,
+// which is worse than an unexpected one.
+let clawBackSound: UNNotificationSound = {
+  let name = "Pop.aiff"
+  guard FileManager.default.fileExists(atPath: "/System/Library/Sounds/\(name)")
+  else { return .default }
+  return UNNotificationSound(named: UNNotificationSoundName(name))
+}()
+
 // A random crab icon from the bundled Resources/Crabs, copied to a fresh temp
 // URL so UNNotificationAttachment can take ownership without moving the
 // original out of the bundle. Returns nil if there are none (notification then
@@ -155,7 +166,7 @@ func sendNotification(args: [String]) async {
   let content = UNMutableNotificationContent()
   content.title = title
   content.body = message
-  content.sound = .default
+  content.sound = clawBackSound
   // Break through Focus modes (needs the time-sensitive entitlement + signing).
   content.interruptionLevel = .timeSensitive
   content.userInfo = FocusPayload.userInfo(
