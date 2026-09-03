@@ -10,5 +10,5 @@ let session_id = ($input.session_id? | default "")
 let app = ($env.HOME | path join "Applications" "ClawdBack.app")
 let wanted = (($source in ["startup" "resume" "clear" "fork"]) or ($event == "UserPromptSubmit"))
 if ($session_id | is-not-empty) and $wanted and ($app | path exists) {
-  ^open $app --args capture --session-id $session_id
+  ^open -gn $app --args capture --session-id $session_id
 }

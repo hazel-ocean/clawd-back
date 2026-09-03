@@ -9,8 +9,8 @@ enum FocusFailure: Equatable {
 }
 
 // A resolved claw-back is one or the other, never a silent no-op.
-enum FocusOutcome {
-  case focus(FocusPlan)
+enum FocusOutcome: Equatable {
+  case reachable
   case failure(FocusFailure)
 }
 
@@ -32,14 +32,16 @@ struct FocusState: Equatable {
 }
 
 // Configurable reaction to a FocusFailure, decoded from config like Application.
-// Only .notify today; spawn / newTab / switchSession slot in with the config
-// schema (docs/plans/configuration.md).
+// Only .notify today, which moves nothing. Anything that rearranges the
+// workspace, spawning a surface or switching a window's session in place, is a
+// deliberate omission: a click that cannot land should explain itself, not
+// redecorate.
 enum FocusFailureResponse: String, Codable, CaseIterable {
   case notify
 }
 
 // A session failure is the more actionable one (we can name the session), so it
-// wins over a gone window. A reachable target yields today's focus plan.
+// wins over a gone window.
 func resolveFocus(
   term: any AppActivation,
   terminalTarget: WindowFocusTarget?,
@@ -59,14 +61,11 @@ func resolveFocus(
     }
   }
   if let wf = term as? WindowFocus, let target = terminalTarget,
-    !wf.windowExists(target.window)
+    !wf.windowExists(target)
   {
     return .failure(.windowGone)
   }
-  return .focus(
-    focusPlan(
-      term: term, terminalTarget: terminalTarget, multiplexerTarget: multiplexerTarget,
-      resolveMultiplexer: resolveMultiplexer))
+  return .reachable
 }
 
 func handleFocusFailure(
@@ -135,7 +134,7 @@ private func sendLocatorNotification(_ failure: FocusFailure, state: FocusState)
   let content = UNMutableNotificationContent()
   content.title = title
   content.body = body
-  content.sound = .default
+  content.sound = clawBackSound()
   content.interruptionLevel = .timeSensitive
   // Same identity and payload as the banner this replaces: one live notification
   // per session, dismissible by the next prompt and by skip-when-viewing.

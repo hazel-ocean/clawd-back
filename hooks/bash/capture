@@ -19,4 +19,4 @@ case "$source" in
   *) [ "$event" = "UserPromptSubmit" ] || exit 0 ;;
 esac
 
-open "$app" --args capture --session-id "$sid"
+open -gn "$app" --args capture --session-id "$sid"
