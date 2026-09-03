@@ -27,6 +27,9 @@ enum Counter: String {
   case notificationPosted
   case notificationSkippedWhileViewing
   case notificationNotAuthorized
+  // A config file that is present but cannot be read as one.
+  case configUndecodable
+  case configApplicationUnknown
   case soundUnavailable
   case unknownMode
   case windowIdFromAccessibility

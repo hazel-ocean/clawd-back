@@ -1,8 +1,11 @@
 import Foundation
 import TOMLDecoder
 
+// Every field is optional: a config that sets one thing must not have to
+// restate the others. A required field here fails the whole decode, which
+// reverts every setting to its default and looks like the file was ignored.
 struct AppConfig: Codable {
-  let application: String
+  let application: String?
   // Required when application == "generic": the bundle id of the app to
   // claw back to, since .generic has no fixed identity of its own.
   let bundleIdentifier: String?
@@ -25,21 +28,22 @@ func loadConfig() -> AppConfig? {
   let configDir = FileManager.default.homeDirectoryForCurrentUser
     .appendingPathComponent(".config/clawd-back", isDirectory: true)
 
-  if let data = try? Data(contentsOf: configDir.appendingPathComponent("config.toml")),
-    let config = try? TOMLDecoder().decode(AppConfig.self, from: data)
-  {
-    return config
+  if let data = try? Data(contentsOf: configDir.appendingPathComponent("config.toml")) {
+    if let config = try? TOMLDecoder().decode(AppConfig.self, from: data) { return config }
+    counter(.configUndecodable)
   }
-  if let data = try? Data(contentsOf: configDir.appendingPathComponent("config.json")),
-    let config = try? JSONDecoder().decode(AppConfig.self, from: data)
-  {
-    return config
+  if let data = try? Data(contentsOf: configDir.appendingPathComponent("config.json")) {
+    if let config = try? JSONDecoder().decode(AppConfig.self, from: data) { return config }
+    counter(.configUndecodable)
   }
   return nil
 }
 
 func loadConfiguredApp() -> any AppActivation {
-  guard let config = loadConfig(), let application = Application(rawValue: config.application)
-  else { return Ghostty() }
+  guard let config = loadConfig(), let name = config.application else { return Ghostty() }
+  guard let application = Application(rawValue: name) else {
+    counter(.configApplicationUnknown)
+    return Ghostty()
+  }
   return resolvedApp(for: application, bundleIdentifier: config.bundleIdentifier)
 }
