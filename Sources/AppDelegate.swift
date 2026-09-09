@@ -59,7 +59,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
     }
 
     let state = FocusPayload.decode(response.notification.request.content.userInfo)
-    let term = loadConfiguredApp()
+    let term = appForSession(host: state.host)
 
     switch resolveFocus(
       term: term, terminalTarget: state.terminal, multiplexerTarget: state.multiplexer)
@@ -76,7 +76,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
       // session to Claude's pane.
       focusPlan(
         term: term, terminalTarget: state.terminal, multiplexerTarget: state.multiplexer,
-        raised: raised
+        raised: raised, hostRecorded: state.host != nil
       ).runDetached()
 
       guard raised else {

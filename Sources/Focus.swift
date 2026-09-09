@@ -65,13 +65,16 @@ func focusPlan(
   terminalTarget: WindowFocusTarget?,
   multiplexerTarget: MultiplexerFocusTarget?,
   resolveMultiplexer: (MultiplexerKind) -> any MultiplexerFocus = multiplexer(for:),
-  raised: Bool = false
+  raised: Bool = false,
+  hostRecorded: Bool = false
 ) -> FocusPlan {
   var plan = FocusPlan()
   let hasTerminal = terminalTarget != nil && term is WindowFocus
-  // Nothing to focus (e.g. an un-captured session): empty plan, so a stray
-  // notification can't clobber a correct focus from another one.
-  guard hasTerminal || multiplexerTarget != nil else { return plan }
+  // A recorded host is a target on its own: an app whose windows we cannot
+  // address still comes forward on activation, which is the whole claw-back for
+  // a single-window host. Nothing at all (an un-captured session) gives an empty
+  // plan, so a stray notification can't clobber a correct focus from another one.
+  guard hasTerminal || multiplexerTarget != nil || hostRecorded else { return plan }
 
   // Wait out this app's self-terminate so the focus lands after we've quit and
   // the terminal has settled (otherwise our quit resets the tab). A fixed sleep
@@ -126,6 +129,7 @@ enum FocusPayload {
   static func userInfo(
     terminal: WindowFocusTarget?, multiplexer: MultiplexerFocusTarget?,
     title: String, message: String, folder: String?, cwd: String?, sessionId: String?,
+    host: String? = nil,
     isLocator: Bool = false
   ) -> [String: Any] {
     [
@@ -136,6 +140,7 @@ enum FocusPayload {
       "folder": folder ?? "",
       "cwd": cwd ?? "",
       "session_id": sessionId ?? "",
+      "host": host ?? "",
       "locator": isLocator,
     ]
   }
@@ -144,6 +149,7 @@ enum FocusPayload {
     let folder = userInfo["folder"] as? String
     let cwd = userInfo["cwd"] as? String
     let sessionId = userInfo["session_id"] as? String
+    let host = userInfo["host"] as? String
     return FocusState(
       terminal: decodeJSON(WindowFocusTarget.self, from: userInfo["terminal_target"] as? String),
       multiplexer: decodeJSON(
@@ -153,6 +159,7 @@ enum FocusPayload {
       folder: (folder?.isEmpty ?? true) ? nil : folder,
       cwd: (cwd?.isEmpty ?? true) ? nil : cwd,
       sessionId: (sessionId?.isEmpty ?? true) ? nil : sessionId,
+      host: (host?.isEmpty ?? true) ? nil : host,
       isLocator: userInfo["locator"] as? Bool ?? false)
   }
 }

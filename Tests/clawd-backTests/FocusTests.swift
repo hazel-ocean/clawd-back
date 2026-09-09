@@ -90,6 +90,15 @@ final class FocusPlanTests: XCTestCase {
     XCTAssertTrue(plan.steps.isEmpty)
   }
 
+  // A host we cannot address by window still comes forward, which is the whole
+  // claw-back for a single-window host.
+  func testRecordedHostWithNoTargetsActivates() {
+    let term = AccessibilityApp(bundleIdentifier: "md.obsidian")
+    let plan = focusPlan(
+      term: term, terminalTarget: nil, multiplexerTarget: nil, hostRecorded: true)
+    XCTAssertEqual(plan.steps, waitForQuit + ["/usr/bin/open -b 'md.obsidian'"])
+  }
+
   func testTerminalTargetOnBaselineIsIgnored() {
     // A window target with a terminal that can't address windows ⇒ no plan.
     let term = FakeBaseline(kind: .rio, isFrontmost: false)
@@ -227,6 +236,15 @@ final class FocusPayloadTests: XCTestCase {
     XCTAssertEqual(state.sessionId, "abc-123")
   }
 
+  // The click handler is a fresh process holding only this payload, so the host
+  // has to cross with the targets or it resolves the wrong driver.
+  func testRoundTripsTheHost() {
+    let info = FocusPayload.userInfo(
+      terminal: nil, multiplexer: nil, title: "T", message: "m", folder: nil, cwd: nil,
+      sessionId: "abc-123", host: "md.obsidian")
+    XCTAssertEqual(FocusPayload.decode(info).host, "md.obsidian")
+  }
+
   func testEmptyFolderAndCwdDecodeNil() {
     let info = FocusPayload.userInfo(
       terminal: nil, multiplexer: nil, title: "T", message: "m", folder: nil, cwd: nil,
@@ -235,6 +253,7 @@ final class FocusPayloadTests: XCTestCase {
     XCTAssertNil(state.folder)
     XCTAssertNil(state.cwd)
     XCTAssertNil(state.sessionId)
+    XCTAssertNil(state.host)
   }
 }
 

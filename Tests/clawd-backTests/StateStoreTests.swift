@@ -81,6 +81,21 @@ final class StateStoreTests: XCTestCase {
     XCTAssertEqual(StateStore.load(sessionId)?.notified, true)
   }
 
+  // A host with no window/tab of its own is the only thing worth saving for a
+  // single-window host, so it has to survive on its own.
+  func testHostRoundTripsWithoutTargets() {
+    let sessionId = "clawd-test-\(UUID().uuidString)"
+    defer { StateStore.clear(sessionId) }
+    StateStore.save(
+      SessionState(terminal: nil, multiplexer: nil, host: "md.obsidian"),
+      sessionId: sessionId)
+    XCTAssertEqual(StateStore.load(sessionId)?.host, "md.obsidian")
+  }
+
+  func testStateWithoutHostFieldDecodes() {
+    XCTAssertNil(decode(#"{"terminal":{"window":"w1","tab":"t1"}}"#)?.host)
+  }
+
   func testStateWithoutNotifiedFieldDecodes() {
     let decoded = decode(#"{"terminal":{"window":"w1","tab":"t1"}}"#)
     XCTAssertEqual(decoded?.terminal, WindowFocusTarget(window: "w1", tab: "t1"))

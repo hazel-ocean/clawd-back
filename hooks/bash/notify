@@ -36,4 +36,12 @@ if [ -n "$transcript" ] && [ -f "$transcript" ] && command -v jq >/dev/null 2>&1
 fi
 body=${said:-"Click to go check on Clawd"}
 
-open -gn "$app" --args notify --title "$title" --message "$body" --session-id "$sid" --cwd "$cwd"
+# macOS stamps the launching app's bundle id on this process, so it names the
+# host the session runs in. Forwarded because LaunchServices overwrites it with
+# ClawdBack's own id in the app `open` launches.
+open -gn "$app" --args notify \
+  --title "$title" \
+  --message "$body" \
+  --session-id "$sid" \
+  --cwd "$cwd" \
+  --host-bundle-id "${__CFBundleIdentifier:-}"

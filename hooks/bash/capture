@@ -19,4 +19,9 @@ case "$source" in
   *) [ "$event" = "UserPromptSubmit" ] || exit 0 ;;
 esac
 
-open -gn "$app" --args capture --session-id "$sid"
+# macOS stamps the launching app's bundle id on this process, so it names the
+# host the session runs in. Forwarded because LaunchServices overwrites it with
+# ClawdBack's own id in the app `open` launches.
+open -gn "$app" --args capture \
+  --session-id "$sid" \
+  --host-bundle-id "${__CFBundleIdentifier:-}"

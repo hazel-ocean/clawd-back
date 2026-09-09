@@ -36,6 +36,16 @@ let workspace = ($env.ZELLIJ_SESSION_NAME? | default "")
 let title = (if ($workspace | is-empty) { $reason } else { $"[($workspace)] ($reason)" })
 let body = (if ($last_said | str trim | is-empty) { "Click to go check on Clawd" } else { $last_said })
 
+# macOS stamps the launching app's bundle id on this process, so it names the
+# host the session runs in. Forwarded because LaunchServices overwrites it with
+# ClawdBack's own id in the app `open` launches.
+let host = ($env.__CFBundleIdentifier? | default "")
+
 if ($app | path exists) {
-  ^open -gn $app --args notify --title $title --message $body --session-id $session_id --cwd $cwd
+  (^open -gn $app --args notify
+    --title $title
+    --message $body
+    --session-id $session_id
+    --cwd $cwd
+    --host-bundle-id $host)
 }

@@ -61,14 +61,17 @@ func captureAndSave(args: [String]) -> Bool {
   let dismissed = existing?.notified == true
   if dismissed { dismissNotification(sessionId: sessionId) }
 
-  let term = loadConfiguredApp()
+  // Re-read every prompt, same as the window/tab, so a session that moves host
+  // corrects itself; an environment that names none keeps what was recorded.
+  let host = hostBundleId(parseArg(args, flag: "--host-bundle-id")) ?? existing?.host
+  let term = appForSession(host: host)
   let multiplexerTarget = recapturedMultiplexer(
     existing: existing?.multiplexer, env: ProcessInfo.processInfo.environment)
   let terminalTarget = recapturedTerminal(
     term: term, existing: existing?.terminal, multiplexer: multiplexerTarget)
 
   persist(
-    SessionState(terminal: terminalTarget, multiplexer: multiplexerTarget),
+    SessionState(terminal: terminalTarget, multiplexer: multiplexerTarget, host: host),
     sessionId: sessionId)
   return dismissed
 }
@@ -137,7 +140,10 @@ func sendNotification(args: [String]) async {
 
   let sessionId = parseArg(args, flag: "--session-id")
   let saved = sessionId.flatMap { StateStore.load($0) }
-  let term = loadConfiguredApp()
+  // A client that fires neither SessionStart nor UserPromptSubmit still
+  // notifies, so read the host here too rather than rely on a capture.
+  let host = hostBundleId(parseArg(args, flag: "--host-bundle-id")) ?? saved?.host
+  let term = appForSession(host: host)
 
   // Any pane the user walked over to since its notification arrived is stale,
   // including this session's own when the skip below applies.
@@ -184,7 +190,8 @@ func sendNotification(args: [String]) async {
   content.interruptionLevel = .timeSensitive
   content.userInfo = FocusPayload.userInfo(
     terminal: terminalTarget, multiplexer: multiplexerTarget,
-    title: baseTitle, message: message, folder: folder, cwd: cwd, sessionId: sessionId)
+    title: baseTitle, message: message, folder: folder, cwd: cwd, sessionId: sessionId,
+    host: host)
   if let crab = randomCrabAttachment() {
     content.attachments = [crab]
   }
@@ -200,7 +207,10 @@ func sendNotification(args: [String]) async {
     counter(.notificationPosted)
     if let sessionId, !sessionId.isEmpty {
       var state =
-        saved ?? SessionState(terminal: terminalTarget, multiplexer: multiplexerTarget)
+        saved
+        ?? SessionState(
+          terminal: terminalTarget, multiplexer: multiplexerTarget, host: host)
+      state.host = host
       state.notified = true
       StateStore.save(state, sessionId: sessionId)
     }
