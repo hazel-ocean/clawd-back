@@ -16,7 +16,7 @@ cwd=$(get cwd); cwd=${cwd:-$PWD}
 # Title states the reason: the specific Notification message, or the finished
 # state on Stop.
 case "$event" in
-  Notification) title=${message:-"Claude needs your input"} ;;
+  Notification) title=${message:-"Claude has something to say"} ;;
   *)            title="Claude has finished and is waiting" ;;
 esac
 

@@ -27,7 +27,7 @@ let last_said = (
 # finished state. Body always carries Claude's last transcript text as color,
 # nudging you over when there's none to show.
 let reason = (match $event {
-  "Notification" => (if ($message | str trim | is-empty) { "Claude needs your input" } else { $message })
+  "Notification" => (if ($message | str trim | is-empty) { "Claude has something to say" } else { $message })
   "Stop" | _     => "Claude has finished and is waiting"
 })
 # Lead with the zellij session name when present, so a glance tells you which
