@@ -27,7 +27,7 @@ let last_said = (
 # finished state. Body always carries Claude's last transcript text as color,
 # nudging you over when there's none to show.
 let reason = (match $event {
-  "Notification" => (if ($message | str trim | is-empty) { "Claude needs your input" } else { $message })
+  "Notification" => (if ($message | str trim | is-empty) { "Claude has something to say" } else { $message })
   "Stop" | _     => "Claude has finished and is waiting"
 })
 # Lead with the zellij session name when present, so a glance tells you which
@@ -36,6 +36,16 @@ let workspace = ($env.ZELLIJ_SESSION_NAME? | default "")
 let title = (if ($workspace | is-empty) { $reason } else { $"[($workspace)] ($reason)" })
 let body = (if ($last_said | str trim | is-empty) { "Click to go check on Clawd" } else { $last_said })
 
+# macOS stamps the launching app's bundle id on this process, so it names the
+# host the session runs in. Forwarded because LaunchServices overwrites it with
+# ClawdBack's own id in the app `open` launches.
+let host = ($env.__CFBundleIdentifier? | default "")
+
 if ($app | path exists) {
-  ^open $app --args notify --title $title --message $body --session-id $session_id --cwd $cwd
+  (^open -gn $app --args notify
+    --title $title
+    --message $body
+    --session-id $session_id
+    --cwd $cwd
+    --host-bundle-id $host)
 }

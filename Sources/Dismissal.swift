@@ -20,15 +20,15 @@ func dismissNotification(sessionId: String) {
 // delivered list is the whole work queue and needs no extra state. Locator
 // notifications carry the same payload, so they clear the same way.
 func dismissViewedNotifications(term: any AppActivation) async {
-  // Nothing is viewed while the terminal is in the background, so the
-  // per-notification probes never run in that case.
-  guard term.isFrontmost else { return }
-
   let center = UNUserNotificationCenter.current()
   let viewed = await center.deliveredNotifications().filter { notification in
     let state = FocusPayload.decode(notification.request.content.userInfo)
+    // Each banner is judged against its own host: sessions in different hosts
+    // notify at once, so this caller's host says nothing about theirs. isViewing
+    // checks frontmost itself, so the costly probes stay behind that check.
+    let app = state.host.map(resolvedHost) ?? term
     return isViewing(
-      term: term, terminalTarget: state.terminal, multiplexerTarget: state.multiplexer)
+      term: app, terminalTarget: state.terminal, multiplexerTarget: state.multiplexer)
   }
   guard !viewed.isEmpty else { return }
   center.removeDeliveredNotifications(withIdentifiers: viewed.map { $0.request.identifier })

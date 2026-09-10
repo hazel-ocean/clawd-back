@@ -38,7 +38,7 @@ func isViewing(
   guard term.isFrontmost else { return false }
   var confirmed = false
   if let wf = term as? WindowFocus, let target = terminalTarget {
-    guard wf.frontTarget() == target else { return false }
+    guard wf.frontTarget()?.isSameWindow(as: target) == true else { return false }
     confirmed = true
   }
   if let target = multiplexerTarget {
@@ -56,17 +56,25 @@ func isViewing(
 // is a session-state change with no OS-focus effect, so it goes first; the
 // terminal window raise goes LAST so nothing steals the window back afterward
 // (an earlier ordering ran the pane focus last and the window lost frontmost).
+//
+// `raised` says a WindowServer raise already fronted the window. That raise is
+// the exception to the run-after-quit rule, being private in-process calls, so
+// the caller performs it first and these steps land on top of it.
 func focusPlan(
   term: any AppActivation,
   terminalTarget: WindowFocusTarget?,
   multiplexerTarget: MultiplexerFocusTarget?,
-  resolveMultiplexer: (MultiplexerKind) -> any MultiplexerFocus = multiplexer(for:)
+  resolveMultiplexer: (MultiplexerKind) -> any MultiplexerFocus = multiplexer(for:),
+  raised: Bool = false,
+  hostRecorded: Bool = false
 ) -> FocusPlan {
   var plan = FocusPlan()
   let hasTerminal = terminalTarget != nil && term is WindowFocus
-  // Nothing to focus (e.g. an un-captured session): empty plan, so a stray
-  // notification can't clobber a correct focus from another one.
-  guard hasTerminal || multiplexerTarget != nil else { return plan }
+  // A recorded host is a target on its own: an app whose windows we cannot
+  // address still comes forward on activation, which is the whole claw-back for
+  // a single-window host. Nothing at all (an un-captured session) gives an empty
+  // plan, so a stray notification can't clobber a correct focus from another one.
+  guard hasTerminal || multiplexerTarget != nil || hostRecorded else { return plan }
 
   // Wait out this app's self-terminate so the focus lands after we've quit and
   // the terminal has settled (otherwise our quit resets the tab). A fixed sleep
@@ -83,16 +91,34 @@ func focusPlan(
   // raise and steal focus back, e.g. to another display's window. Activate only
   // when no window raise will run (baseline terminals, or a mux-only target).
   if let wf = term as? WindowFocus, let target = terminalTarget {
-    plan.add(wf.focusSteps(for: target))
+    plan.add(wf.focusSteps(for: target, raised: raised))
     // Re-assert once: macOS reactivates the prior front app as we quit, which can
     // steal the window back right after the first raise. `select tab` + `focus`
     // are idempotent, so a second pass is a no-op when the first already won.
-    plan.add("sleep 0.15")
-    plan.add(wf.focusSteps(for: target))
+    // A WindowServer raise fronts the window id itself, so it needs no re-assert.
+    if !raised {
+      plan.add("sleep 0.15")
+      plan.add(wf.focusSteps(for: target, raised: false))
+    }
   } else {
     plan.add(term.activationStep())
   }
   return plan
+}
+
+// The window to front in-process before the plan runs, or nil when that is not
+// possible: the build's gate is shut, the target predates window ids, or the
+// app is not running. `raiseSupported` answers for the build, not the machine;
+// the OS and symbol checks live in the raise itself.
+func raiseRequest(
+  term: any AppActivation,
+  target: WindowFocusTarget?,
+  raiseSupported: Bool = architectureSupported
+) -> RaiseRequest? {
+  guard raiseSupported, term is WindowFocus,
+    let window = target?.cgWindowId, let pid = term.pid
+  else { return nil }
+  return RaiseRequest(pid: pid, window: window)
 }
 
 // Bridges the focus targets through the notification's userInfo, which must hold
@@ -103,6 +129,7 @@ enum FocusPayload {
   static func userInfo(
     terminal: WindowFocusTarget?, multiplexer: MultiplexerFocusTarget?,
     title: String, message: String, folder: String?, cwd: String?, sessionId: String?,
+    host: String? = nil,
     isLocator: Bool = false
   ) -> [String: Any] {
     [
@@ -113,6 +140,7 @@ enum FocusPayload {
       "folder": folder ?? "",
       "cwd": cwd ?? "",
       "session_id": sessionId ?? "",
+      "host": host ?? "",
       "locator": isLocator,
     ]
   }
@@ -121,6 +149,7 @@ enum FocusPayload {
     let folder = userInfo["folder"] as? String
     let cwd = userInfo["cwd"] as? String
     let sessionId = userInfo["session_id"] as? String
+    let host = userInfo["host"] as? String
     return FocusState(
       terminal: decodeJSON(WindowFocusTarget.self, from: userInfo["terminal_target"] as? String),
       multiplexer: decodeJSON(
@@ -130,6 +159,7 @@ enum FocusPayload {
       folder: (folder?.isEmpty ?? true) ? nil : folder,
       cwd: (cwd?.isEmpty ?? true) ? nil : cwd,
       sessionId: (sessionId?.isEmpty ?? true) ? nil : sessionId,
+      host: (host?.isEmpty ?? true) ? nil : host,
       isLocator: userInfo["locator"] as? Bool ?? false)
   }
 }

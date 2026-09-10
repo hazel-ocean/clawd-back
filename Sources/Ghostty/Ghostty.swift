@@ -15,10 +15,12 @@ struct Ghostty: WindowFocus {
       let out = runProcess("/usr/bin/osascript", [script]), out.contains("\t")
     else { return nil }
     let p = out.components(separatedBy: "\t")
-    return p.count == 2 ? WindowFocusTarget(window: p[0], tab: p[1]) : nil
+    guard p.count == 2 else { return nil }
+    return WindowFocusTarget(
+      window: p[0], tab: p[1], cgWindowId: pid.flatMap { focusedWindowId(pid: $0) })
   }
 
-  func windowExists(_ window: String) -> Bool {
+  func windowStillOpen(_ window: String) -> Bool {
     guard
       let script = bundledResource("Ghostty/ghostty-window-exists.applescript"),
       let out = runProcess("/usr/bin/osascript", [script, window])
@@ -28,7 +30,8 @@ struct Ghostty: WindowFocus {
 
   // The ids ride across as osascript argv, so nothing is interpolated into the
   // AppleScript source: no escaping, no temp file, no injection surface.
-  func focusSteps(for target: WindowFocusTarget) -> [String] {
+  // `raised` is unused: the `focus` verb carries its own activation.
+  func focusSteps(for target: WindowFocusTarget, raised: Bool) -> [String] {
     guard let script = bundledResource("Ghostty/ghostty-focus.applescript")
     else { return [] }
     var step = "/usr/bin/osascript \(shq(script)) \(shq(target.window))"

@@ -9,6 +9,7 @@ private let waitForQuit = ["while kill -0 \"$CLAWD_PID\" 2>/dev/null; do sleep 0
 private struct FakeBaseline: AppActivation {
   let kind: Application
   var isFrontmost: Bool
+  var pid: pid_t? = nil
   var bundleIdentifier: String { kind.bundleIdentifier! }
 }
 
@@ -18,10 +19,13 @@ private struct FakeWindowTerminal: WindowFocus {
   var front: WindowFocusTarget?
   var steps: [String]
   var exists: Bool = true
+  var pid: pid_t? = nil
   var bundleIdentifier: String { kind.bundleIdentifier! }
   func frontTarget() -> WindowFocusTarget? { front }
-  func windowExists(_ window: String) -> Bool { exists }
-  func focusSteps(for target: WindowFocusTarget) -> [String] { steps }
+  func windowStillOpen(_ window: String) -> Bool { exists }
+  func focusSteps(for target: WindowFocusTarget, raised: Bool) -> [String] {
+    raised ? steps.filter { !$0.hasPrefix("/usr/bin/open") } : steps
+  }
 }
 
 private struct FakeMux: MultiplexerFocus {
@@ -86,6 +90,15 @@ final class FocusPlanTests: XCTestCase {
     XCTAssertTrue(plan.steps.isEmpty)
   }
 
+  // A host we cannot address by window still comes forward, which is the whole
+  // claw-back for a single-window host.
+  func testRecordedHostWithNoTargetsActivates() {
+    let term = AccessibilityApp(bundleIdentifier: "md.obsidian")
+    let plan = focusPlan(
+      term: term, terminalTarget: nil, multiplexerTarget: nil, hostRecorded: true)
+    XCTAssertEqual(plan.steps, waitForQuit + ["/usr/bin/open -b 'md.obsidian'"])
+  }
+
   func testTerminalTargetOnBaselineIsIgnored() {
     // A window target with a terminal that can't address windows ⇒ no plan.
     let term = FakeBaseline(kind: .rio, isFrontmost: false)
@@ -103,10 +116,6 @@ final class ResolveFocusTests: XCTestCase {
   }
   private func failure(_ outcome: FocusOutcome) -> FocusFailure? {
     if case .failure(let f) = outcome { return f }
-    return nil
-  }
-  private func plan(_ outcome: FocusOutcome) -> FocusPlan? {
-    if case .focus(let p) = outcome { return p }
     return nil
   }
 
@@ -158,21 +167,53 @@ final class ResolveFocusTests: XCTestCase {
     XCTAssertEqual(failure(outcome), .sessionDetached)
   }
 
-  func testHealthyResolvesToTodaysFocusPlan() {
+  // Resolution answers reachability only; the steps are focusPlan's business
+  // and are asserted there.
+  func testHealthyTargetIsReachable() {
     let term = FakeWindowTerminal(
       kind: .ghostty, isFrontmost: false, front: nil, steps: ["SELECT"])
     let mux = FakeMux(kind: .zellij, focused: false, steps: ["FOCUS"])
     let outcome = resolveFocus(
       term: term, terminalTarget: winTarget, multiplexerTarget: muxTarget,
       resolveMultiplexer: resolve(mux))
-    XCTAssertEqual(plan(outcome)?.steps, waitForQuit + ["FOCUS", "SELECT", "sleep 0.15", "SELECT"])
+    XCTAssertEqual(outcome, .reachable)
   }
 
-  func testBaselineNoMultiplexerResolvesToFocus() {
+  func testBaselineNoMultiplexerIsReachable() {
     let term = FakeBaseline(kind: .rio, isFrontmost: false)
     let outcome = resolveFocus(
       term: term, terminalTarget: winTarget, multiplexerTarget: nil)
-    XCTAssertNotNil(plan(outcome))
+    XCTAssertEqual(outcome, .reachable)
+  }
+}
+
+final class RecaptureTests: XCTestCase {
+  private let saved = WindowFocusTarget(window: "w1", tab: "t1", cgWindowId: 42)
+
+  private func term(front: WindowFocusTarget?) -> FakeWindowTerminal {
+    FakeWindowTerminal(kind: .ghostty, isFrontmost: true, front: front, steps: ["SELECT"])
+  }
+
+  // A read from another Space sees no window id; the saved one is still good.
+  func testKeepsTheSavedWindowIdWhenTheReadHasNone() {
+    let fresh = WindowFocusTarget(window: "w1", tab: "t1")
+    let result = recapturedTerminal(
+      term: term(front: fresh), existing: saved, multiplexer: nil)
+    XCTAssertEqual(result?.cgWindowId, 42)
+  }
+
+  func testDoesNotBorrowAnIdFromADifferentWindow() {
+    let fresh = WindowFocusTarget(window: "w2", tab: "t1")
+    let result = recapturedTerminal(
+      term: term(front: fresh), existing: saved, multiplexer: nil)
+    XCTAssertNil(result?.cgWindowId)
+  }
+
+  func testAFreshIdWins() {
+    let fresh = WindowFocusTarget(window: "w1", tab: "t1", cgWindowId: 99)
+    let result = recapturedTerminal(
+      term: term(front: fresh), existing: saved, multiplexer: nil)
+    XCTAssertEqual(result?.cgWindowId, 99)
   }
 }
 
@@ -195,6 +236,15 @@ final class FocusPayloadTests: XCTestCase {
     XCTAssertEqual(state.sessionId, "abc-123")
   }
 
+  // The click handler is a fresh process holding only this payload, so the host
+  // has to cross with the targets or it resolves the wrong driver.
+  func testRoundTripsTheHost() {
+    let info = FocusPayload.userInfo(
+      terminal: nil, multiplexer: nil, title: "T", message: "m", folder: nil, cwd: nil,
+      sessionId: "abc-123", host: "md.obsidian")
+    XCTAssertEqual(FocusPayload.decode(info).host, "md.obsidian")
+  }
+
   func testEmptyFolderAndCwdDecodeNil() {
     let info = FocusPayload.userInfo(
       terminal: nil, multiplexer: nil, title: "T", message: "m", folder: nil, cwd: nil,
@@ -203,6 +253,7 @@ final class FocusPayloadTests: XCTestCase {
     XCTAssertNil(state.folder)
     XCTAssertNil(state.cwd)
     XCTAssertNil(state.sessionId)
+    XCTAssertNil(state.host)
   }
 }
 

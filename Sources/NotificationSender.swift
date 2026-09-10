@@ -1,5 +1,29 @@
+import AppKit
 import Foundation
 import UserNotifications
+
+// Named rather than `.default`, so a claw-back is recognisable as this app and
+// not as whatever the user set for system beeps.
+//
+// NSSound resolves the same search path UNNotificationSound uses, the app
+// bundle then the Library/Sounds directories, and it is case sensitive. So it
+// answers the question that matters about a configured name: will it actually
+// play. One that resolves to nothing posts a silent notification, which is
+// worse than an unexpected sound.
+let defaultSoundName = "Pop"
+
+func clawBackSound() -> UNNotificationSound {
+  let configured = loadConfig()?.sound ?? defaultSoundName
+  guard NSSound(named: configured) != nil else {
+    counter(.soundUnavailable)
+    return .default
+  }
+  // The system set is all .aiff; a name carrying its own extension is somebody's
+  // own file and is left alone.
+  let file = (configured as NSString).pathExtension.isEmpty
+    ? "\(configured).aiff" : configured
+  return UNNotificationSound(named: UNNotificationSoundName(file))
+}
 
 // A random crab icon from the bundled Resources/Crabs, copied to a fresh temp
 // URL so UNNotificationAttachment can take ownership without moving the
@@ -37,14 +61,17 @@ func captureAndSave(args: [String]) -> Bool {
   let dismissed = existing?.notified == true
   if dismissed { dismissNotification(sessionId: sessionId) }
 
-  let term = loadConfiguredApp()
+  // Re-read every prompt, same as the window/tab, so a session that moves host
+  // corrects itself; an environment that names none keeps what was recorded.
+  let host = hostBundleId(parseArg(args, flag: "--host-bundle-id")) ?? existing?.host
+  let term = appForSession(host: host)
   let multiplexerTarget = recapturedMultiplexer(
     existing: existing?.multiplexer, env: ProcessInfo.processInfo.environment)
   let terminalTarget = recapturedTerminal(
     term: term, existing: existing?.terminal, multiplexer: multiplexerTarget)
 
   persist(
-    SessionState(terminal: terminalTarget, multiplexer: multiplexerTarget),
+    SessionState(terminal: terminalTarget, multiplexer: multiplexerTarget, host: host),
     sessionId: sessionId)
   return dismissed
 }
@@ -65,10 +92,17 @@ func recapturedTerminal(
 
   let paneConfirms =
     multiplexer.map { resolveMultiplexer($0.kind).isFocused(on: $0) } ?? false
-  if term.isFrontmost || paneConfirms, let front = wf.frontTarget() {
+  if term.isFrontmost || paneConfirms, var front = wf.frontTarget() {
+    // The on-screen list holds only the current Space, so a read taken from
+    // elsewhere carries no window id, and the pane confirms from anywhere.
+    // Keep the saved id rather than trade a cross-Space raise for a fresh read
+    // of the same window.
+    if front.cgWindowId == nil, let existing, existing.isSameWindow(as: front) {
+      front.cgWindowId = existing.cgWindowId
+    }
     return front
   }
-  guard let existing, wf.windowExists(existing.window) else { return nil }
+  guard let existing, wf.windowExists(existing) else { return nil }
   return existing
 }
 
@@ -106,7 +140,10 @@ func sendNotification(args: [String]) async {
 
   let sessionId = parseArg(args, flag: "--session-id")
   let saved = sessionId.flatMap { StateStore.load($0) }
-  let term = loadConfiguredApp()
+  // A client that fires neither SessionStart nor UserPromptSubmit still
+  // notifies, so read the host here too rather than rely on a capture.
+  let host = hostBundleId(parseArg(args, flag: "--host-bundle-id")) ?? saved?.host
+  let term = appForSession(host: host)
 
   // Any pane the user walked over to since its notification arrived is stale,
   // including this session's own when the skip below applies.
@@ -123,6 +160,7 @@ func sendNotification(args: [String]) async {
   if isViewing(
     term: term, terminalTarget: terminalTarget, multiplexerTarget: multiplexerTarget)
   {
+    counter(.notificationSkippedWhileViewing)
     return
   }
 
@@ -137,6 +175,7 @@ func sendNotification(args: [String]) async {
       return
     }
   } else if settings.authorizationStatus == .denied {
+    counter(.notificationNotAuthorized)
     print(
       "Notifications are denied. Please enable in System Settings > Notifications > ClawdBack"
     )
@@ -146,12 +185,13 @@ func sendNotification(args: [String]) async {
   let content = UNMutableNotificationContent()
   content.title = title
   content.body = message
-  content.sound = .default
+  content.sound = clawBackSound()
   // Break through Focus modes (needs the time-sensitive entitlement + signing).
   content.interruptionLevel = .timeSensitive
   content.userInfo = FocusPayload.userInfo(
     terminal: terminalTarget, multiplexer: multiplexerTarget,
-    title: baseTitle, message: message, folder: folder, cwd: cwd, sessionId: sessionId)
+    title: baseTitle, message: message, folder: folder, cwd: cwd, sessionId: sessionId,
+    host: host)
   if let crab = randomCrabAttachment() {
     content.attachments = [crab]
   }
@@ -164,9 +204,13 @@ func sendNotification(args: [String]) async {
 
   do {
     try await center.add(request)
+    counter(.notificationPosted)
     if let sessionId, !sessionId.isEmpty {
       var state =
-        saved ?? SessionState(terminal: terminalTarget, multiplexer: multiplexerTarget)
+        saved
+        ?? SessionState(
+          terminal: terminalTarget, multiplexer: multiplexerTarget, host: host)
+      state.host = host
       state.notified = true
       StateStore.save(state, sessionId: sessionId)
     }

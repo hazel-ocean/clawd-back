@@ -4,5 +4,5 @@ let input = (try { $in | from json } catch { {} })
 let session_id = ($input.session_id? | default "")
 let app = ($env.HOME | path join "Applications" "ClawdBack.app")
 if ($session_id | is-not-empty) and ($app | path exists) {
-  ^open $app --args cleanup --session-id $session_id
+  ^open -gn $app --args cleanup --session-id $session_id
 }

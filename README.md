@@ -22,7 +22,7 @@ It also stays quiet when you are already looking at that session, so you only ge
 ## Requirements
 
 - macOS (uses `UNUserNotificationCenter` + AppKit).
-- A terminal emulator, or any other app you run Claude Code from. **Ghostty** is fully supported (window + tab targeting via AppleScript). The other named terminals (`wezterm`, `iterm2`, `terminal`, `alacritty`, `kitty`, `rio`) degrade to activating the app, plus Zellij pane focus. Any other app (e.g. an editor with an embedded terminal) can be configured as `generic`, which raises its actual window via generic Accessibility scripting instead of just activating the app — see [Configuration](#configuration).
+- A terminal emulator, or any other app you run Claude Code from. Each session records the app it runs in, so several hosts can be in play at once: a terminal in one window, an editor speaking ACP to Claude Code in another. **Ghostty** is fully supported (window + tab targeting via AppleScript). The other named terminals (`wezterm`, `iterm2`, `terminal`, `alacritty`, `kitty`, `rio`) degrade to activating the app, plus Zellij pane focus. Any other app is addressed generically, raising its actual window via Accessibility scripting where it can and activating the app where it cannot — see [Configuration](#configuration).
 - Optional: [Zellij](https://zellij.dev/) with the built-in `action focus-pane-id`.
 
 ## Install
@@ -49,14 +49,20 @@ The flake exposes `packages.default` (an `.app` under `$out/Applications`). Inst
 ```bash
 git clone https://github.com/hazel-ocean/clawd-back
 cd clawd-back
-just install   # builds, bundles, signs, installs to ~/Applications/ClawdBack.app
+just sign   # builds, bundles, and ad-hoc signs ClawdBack.app in this directory
 ```
 
-By default the app is ad-hoc signed. To use a Developer ID: `just install signing_identity="Apple Development: You (XXXXXXXXXX)"`.
+Copy the bundle somewhere LaunchServices can find it, such as `~/Applications`.
+There is no install recipe: where the app lives is the packaging's business, and
+the Nix flake and the Homebrew cask each answer it their own way.
+
+To sign with a Developer ID: `just sign signing_identity="Apple Development: You (XXXXXXXXXX)"`.
 
 > First time you click a notification, macOS asks for permission to control Ghostty (Automation). Grant it. An ad-hoc re-sign on rebuild can reset that grant; the app still comes to the front regardless, only the tab-select needs it.
 >
-> If you configure `application = "generic"` (see [Configuration](#configuration)), a second, distinct permission is needed: **Accessibility** (System Settings → Privacy & Security → Accessibility), since raising another app's window this way goes through System Events. Without it, ClawdBack still activates the app via `open -b`, just without raising the specific window.
+> **Accessibility** (System Settings → Privacy & Security → Accessibility) is a second, distinct permission, and the cross-Space raise needs it. It is how ClawdBack identifies the exact window your session lives in, which is what lets a claw-back cross a Space or enter a full-screen window. Without it a claw-back still activates the app and selects the tab, it just cannot travel to another Space.
+>
+> For `application = "generic"` (see [Configuration](#configuration)) it is required rather than advisable, since raising that app's window goes through System Events. Without it, ClawdBack still activates the app via `open -b`, just without raising the specific window.
 
 ## Claude Code hooks
 
@@ -102,7 +108,7 @@ Nushell (swap `bash` for `nushell`):
 }
 ```
 
-Use whatever path the app actually lives at, `~/Applications/...` if you installed there via `just install`.
+Use whatever path the app actually lives at, `~/Applications/...` for a local copy.
 
 > **Nix users:** the flake installs the app under `~/Applications` (a `/nix/store` path rotates on rebuild). Rather than chase the bundle path, generate your own wrappers with `pkgs.writeScript` and point the hooks at their stable `~/.claude/hooks/...` symlinks. The [`hooks/nushell/`](hooks/nushell/) scripts are a ready template.
 
@@ -112,57 +118,105 @@ The banner title states the reason: on a `Notification` it's the specific messag
 
 Because `open` propagates the caller's environment, `ZELLIJ_SESSION_NAME` / `ZELLIJ_PANE_ID` reach the app when the hook runs inside a Zellij pane.
 
+One variable is the exception. macOS stamps `__CFBundleIdentifier` on every process an application launches, and children inherit it, so inside a session it names the host: `com.mitchellh.ghostty` for a shell in Ghostty, `md.obsidian` for Claude Code run by Obsidian's agent client. The app cannot read it, because LaunchServices overwrites it with ClawdBack's own id in whatever `open` launches. The hooks forward it as `--host-bundle-id` instead.
+
 ### Customizing the notification
 
-`--title` and `--message` are the wrapper's to compute however you like: from the hook payload, the transcript, the environment. `--session-id` and `--cwd` are what the app needs to skip-when-viewing and claw you back, so keep passing them through. Copy a wrapper to `~/.claude/hooks/`, edit it, and point the hook commands there.
+`--title` and `--message` are the wrapper's to compute however you like: from the hook payload, the transcript, the environment. `--session-id`, `--cwd` and `--host-bundle-id` are what the app needs to skip-when-viewing and claw you back, so keep passing them through. A wrapper that drops `--host-bundle-id` still works, it just falls back to the configured application for every session. Copy a wrapper to `~/.claude/hooks/`, edit it, and point the hook commands there.
 
 ## Configuration
 
-Pick the app to claw back to in `~/.config/clawd-back/config.toml` (or `config.json`):
+The app to claw back to is the one the session runs in, taken from the host id the hooks
+forward, so there is nothing to configure for it. Set an application only as the fallback
+for a session whose host nothing named, in `~/.config/clawd-back/config.toml` (or
+`config.json`):
 
 ```toml
 application = "ghostty"  # ghostty | wezterm | iterm2 | terminal | alacritty | kitty | rio | generic
 ```
 
-Defaults to `ghostty` if no config exists.
+The fallback is `ghostty` if no config exists. It answers for a session started where no
+application launched it, under launchd, ssh or cron, and for one whose hooks predate
+`--host-bundle-id`.
 
-For any app without an AppleScript dictionary (anything other than Ghostty
-that isn't one of the named terminals above), use `generic` with its bundle
-id:
+The notification sound is `Pop`, and any sound in the app bundle or a
+`Library/Sounds` directory can replace it by name:
+
+```toml
+sound = "Submarine"
+```
+
+Names are case sensitive, and the extension is optional for the system set
+(`/System/Library/Sounds`). A name that does not resolve falls back to your
+system alert sound and logs `soundUnavailable`, so a typo is audible rather than
+silent.
+
+A recorded host without an AppleScript dictionary (anything other than Ghostty
+that isn't one of the named terminals above) is addressed generically, with no
+configuration. To name one as the fallback as well, pair `generic` with its
+bundle id:
 
 ```toml
 application = "generic"
 bundleIdentifier = "com.example.SomeApp"
 ```
 
-This addresses the app's window by title via generic Accessibility scripting
-rather than a stable id, so it's best-effort: it needs the Accessibility
-permission above, and a window whose title changes between capture and click
-is reported as closed rather than raised.
+Either way, the app's window is addressed by title via generic Accessibility
+scripting rather than a stable id, so it's best-effort: it needs the
+Accessibility permission above. The window is still tracked by its WindowServer
+id, so an app that retitles between capture and click stays reachable. A host
+whose window cannot be addressed at all is activated, which brings it forward
+without picking a window.
+
+### Cross-Space and full-screen focus
+
+A full-screen window is its own Mission Control Space, and no public API moves
+focus across a Space. ClawdBack fronts the saved window through the
+WindowServer directly, which carries the screen to it. That path is verified on
+Apple Silicon, macOS 14 through 26; outside that range it falls back to
+activating the app, so a full-screen target is reached only if macOS happens to
+switch Spaces on activation.
+
+To try it on a macOS release it has not been verified against:
+
+```toml
+forceWindowServerRaiseEnabled = true
+```
+
+This lifts the upper bound only. The lower bound and the Apple Silicon
+requirement stand.
 
 ## How it works
 
 ```
-SessionStart   -->  open ClawdBack.app --args capture --session-id <id>
-UserPromptSubmit    saves window_id + tab_id (+ zellij session/pane)
+SessionStart   -->  open -gn ClawdBack.app --args capture --session-id <id>
+UserPromptSubmit                                    --host-bundle-id <id>
+                    saves host + window_id + tab_id (+ zellij session/pane)
                     to ~/.cache/clawd-back/<id>.json (dropping dead targets)
                     removes this session's delivered notification
 
-Stop / Notify  -->  open ClawdBack.app --args notify --session-id <id> ...
+Stop / Notify  -->  open -gn ClawdBack.app --args notify --session-id <id>
+                                                    --host-bundle-id <id> ...
                     removes the notifications of every window/pane you view now
                     already viewing that window? -> skip
                     else show notification, keyed session:<id>
                     (locator in userInfo, random crab)
 
-click          -->  open -b <terminal>   (bring to front, cross-app)
+click          -->  open -b <host>       (bring to front, cross-app)
                     select saved window + tab
                     zellij: action focus-pane-id terminal_<pane>
 
-SessionEnd     -->  open ClawdBack.app --args cleanup --session-id <id>
+SessionEnd     -->  open -gn ClawdBack.app --args cleanup --session-id <id>
                     removes ~/.cache/clawd-back/<id>.json
 ```
 
-Targeting is by the saved OS window id captured at `SessionStart`, so it is exact regardless of what is frontmost when a notification fires. Ghostty implements window/tab capture + select via its own AppleScript dictionary; `generic` implements window capture + raise via System Events/Accessibility (title-based, best-effort); the other named terminals fall back to activating the app (+ `focus-pane-id`).
+Which app to drive is resolved per session from the recorded host, and the notification carries that host in its payload, so a click resolves the same driver the banner was built with. Sessions in different hosts notify at once, and each banner is judged against its own host when the app clears the ones you are already looking at.
+
+Targeting is by the saved OS window id captured at `SessionStart`, so it is exact regardless of what is frontmost when a notification fires. Ghostty implements window/tab capture + select via its own AppleScript dictionary; `generic` implements window capture + raise via System Events/Accessibility (title-based, best-effort); the other named terminals fall back to activating the app (+ `focus-pane-id`). Both window-addressing paths also save the WindowServer id of the window, which is what carries focus across Spaces and into a full-screen window.
+
+Each mode is launched with `open -gn`: `-n` because `open --args` against an already-running instance delivers nothing and only activates it, and `-g` because a notifier with no window has no business taking focus.
+
+Counters go to the unified log. Read them with `log show --last 1h --predicate 'subsystem == "com.hazel.clawd-back"'`.
 
 ## Project layout
 
@@ -175,8 +229,11 @@ Sources/
   Focus.swift              # focus plans, skip-when-viewing, click payload
   FocusFailure.swift       # unreachable target: locator notification
   Application.swift        # app protocols, window/tab targets, app selection
+  HostApp.swift            # the session's host app: its id, and the driver for it
   Ghostty/                 # window/tab capture + focus via its AppleScript dictionary
   Accessibility/           # same, by window title via System Events (`generic`)
+  WindowServer/            # cross-Space window raise via private SkyLight calls
+  Counters.swift           # claw-back counters, emitted to the unified log
   Multiplexer.swift        # zellij: pane target, focus, attach/focus probes
   StateStore.swift         # ~/.cache/clawd-back/<id>.json
   Config.swift             # app-selection config (TOML/JSON)
