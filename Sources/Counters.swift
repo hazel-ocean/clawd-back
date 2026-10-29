@@ -27,6 +27,11 @@ enum Counter: String {
   case notificationPosted
   case notificationSkippedWhileViewing
   case notificationNotAuthorized
+  // Where a posted body came from. A run of nudges means the wrapper found no
+  // text in the turn.
+  case notificationBodyFromPayload
+  case notificationBodyFromTranscript
+  case notificationBodyNudge
   // A config file that is present but cannot be read as one.
   case configUndecodable
   case configApplicationUnknown

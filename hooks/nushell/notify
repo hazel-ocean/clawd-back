@@ -9,23 +9,51 @@ let transcript = ($input.transcript_path? | default "")
 let cwd = ($input.cwd? | default ($env.PWD? | default ""))
 let app = ($env.HOME | path join "Applications" "ClawdBack.app")
 
-# Claude's last text message, from the tail of the transcript (the final
-# assistant entry is often a tool_use, not text, so scan back a bit).
-let last_said = (
-  if ($transcript | is-not-empty) and ($transcript | path exists) {
-    let texts = (open $transcript | lines | last 150
-      | each { |l| try { $l | from json } catch { null } } | compact
-      | where type? == "assistant"
-      | each { |e| try { $e.message.content | where type? == "text" | get text | str join " " } catch { "" } }
-      | where ($it | str trim | is-not-empty))
-    if ($texts | is-empty) { "" } else { $texts | last | str trim | str replace -a (char newline) " " | str substring 0..180 }
-  } else { "" }
+# A prompt is a user entry with no tool_result in it. Meta user entries are
+# harness text, not the user.
+def is-prompt [e: record] {
+  let content = ($e.message?.content? | default [])
+  ($e.type? == "user") and ($e.isMeta? != true) and (
+    (($content | describe) == "string")
+    or ($content | where type? == "tool_result" | is-empty)
+  )
+}
+
+# Claude's last text in the current turn. Text from an earlier turn would
+# describe work that is already done.
+def turn-text [transcript: string] {
+  if ($transcript | is-empty) or not ($transcript | path exists) { return "" }
+  let entries = (open $transcript | lines | last 300
+    | each { |l| try { $l | from json } catch { null } } | compact)
+  let prompts = ($entries | enumerate | where { |e| is-prompt $e.item })
+  let turn = (if ($prompts | is-empty) { $entries } else {
+    $entries | skip (($prompts | last).index + 1)
+  })
+  let texts = ($turn
+    | where type? == "assistant"
+    | each { |e| try { $e.message.content | where type? == "text" | get text | str join " " } catch { "" } }
+    | where ($it | str trim | is-not-empty))
+  if ($texts | is-empty) { "" } else { $texts | last }
+}
+
+# Stop has the turn's final text in the payload. The transcript can lag
+# behind it.
+let payload_said = ($input.last_assistant_message? | default "" | str trim)
+let said_source = (
+  if $event == "Stop" and ($payload_said | is-not-empty) {
+    {said: $payload_said, source: "payload"}
+  } else {
+    {said: (turn-text $transcript | str trim), source: "transcript"}
+  }
 )
+let last_said = ($said_source.said
+  | str replace -a (char newline) " "
+  | str substring 0..180)
 
 # Title states the reason: on a Notification it's the specific message (which
 # tool needs permission, or idle) from the hook payload; on Stop it's the
-# finished state. Body always carries Claude's last transcript text as color,
-# nudging you over when there's none to show.
+# finished state. Body is Claude's last text in this turn, or a nudge when the
+# turn has none.
 let reason = (match $event {
   "Notification" => (if ($message | str trim | is-empty) { "Claude has something to say" } else { $message })
   "Stop" | _     => "Claude has finished and is waiting"
@@ -34,7 +62,8 @@ let reason = (match $event {
 # workspace wants you.
 let workspace = ($env.ZELLIJ_SESSION_NAME? | default "")
 let title = (if ($workspace | is-empty) { $reason } else { $"[($workspace)] ($reason)" })
-let body = (if ($last_said | str trim | is-empty) { "Click to go check on Clawd" } else { $last_said })
+let body = (if ($last_said | is-empty) { "Click to go check on Clawd" } else { $last_said })
+let body_source = (if ($last_said | is-empty) { "nudge" } else { $said_source.source })
 
 # macOS stamps the launching app's bundle id on this process, so it names the
 # host the session runs in. Forwarded because LaunchServices overwrites it with
@@ -45,6 +74,7 @@ if ($app | path exists) {
   (^open -gn $app --args notify
     --title $title
     --message $body
+    --body-source $body_source
     --session-id $session_id
     --cwd $cwd
     --host-bundle-id $host)
