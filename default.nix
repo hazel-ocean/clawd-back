@@ -1,10 +1,15 @@
 {
   lib,
   stdenv,
+  stdenvNoCC,
   swift,
   swiftpm,
   swiftpm2nix,
   llvm,
+  bash,
+  nushell,
+  jq,
+  makeWrapper,
 }:
 
 let
@@ -15,6 +20,45 @@ let
   # Written by the release (see scripts/build-release.nu), so the store path and
   # the bundle report the same version the release published.
   version = lib.fileContents ./VERSION;
+
+  # The Claude Code hooks, for a nix config to point its hook commands at. Built
+  # from the hook sources alone, so a hook change does not rebuild the app.
+  # libexec, not bin: the names are generic and must stay off PATH. Shebangs
+  # point into the store, so a hook runs without its interpreter on PATH.
+  mkHooks =
+    lang:
+    {
+      buildInputs,
+      postFixup ? "",
+    }:
+    stdenvNoCC.mkDerivation {
+      pname = "clawd-back-hooks-${lang}";
+      inherit version buildInputs postFixup;
+      src = lib.fileset.toSource {
+        root = ./hooks/${lang};
+        fileset = ./hooks/${lang};
+      };
+      nativeBuildInputs = [ makeWrapper ];
+      installPhase = ''
+        runHook preInstall
+        mkdir -p "$out/libexec/clawd-back"
+        cp notify capture cleanup "$out/libexec/clawd-back/"
+        chmod +x "$out/libexec/clawd-back/"*
+        runHook postInstall
+      '';
+    };
+
+  hooks = {
+    nushell = mkHooks "nushell" { buildInputs = [ nushell ]; };
+    # The transcript scan in notify needs jq; without it the body is a nudge.
+    bash = mkHooks "bash" {
+      buildInputs = [ bash ];
+      postFixup = ''
+        wrapProgram "$out/libexec/clawd-back/notify" \
+          --prefix PATH : ${lib.makeBinPath [ jq ]}
+      '';
+    };
+  };
 in
 stdenv.mkDerivation {
   pname = "clawd-back";
@@ -81,6 +125,8 @@ stdenv.mkDerivation {
     chmod +x "$app/Contents/Resources/hooks/"*/*
     runHook postInstall
   '';
+
+  passthru = { inherit hooks; };
 
   meta = {
     description = "macOS notifier that returns you to the Zellij pane Claude Code runs in";
