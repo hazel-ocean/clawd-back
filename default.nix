@@ -24,14 +24,20 @@ let
   # The Claude Code hooks, for a nix config to point its hook commands at. Built
   # from the hook sources alone, so a hook change does not rebuild the app.
   # libexec, not bin: the names are generic and must stay off PATH. Shebangs
-  # point into the store, so a hook runs without its interpreter on PATH.
+  # point into the store, so a hook runs without its interpreter on PATH. Each
+  # hook's path is also an attribute, e.g. `hooks.nushell.notify`.
+  hookNames = [
+    "capture"
+    "notify"
+    "cleanup"
+  ];
   mkHooks =
     lang:
     {
       buildInputs,
       postFixup ? "",
     }:
-    stdenvNoCC.mkDerivation {
+    stdenvNoCC.mkDerivation (finalAttrs: {
       pname = "clawd-back-hooks-${lang}";
       inherit version buildInputs postFixup;
       src = lib.fileset.toSource {
@@ -42,11 +48,14 @@ let
       installPhase = ''
         runHook preInstall
         mkdir -p "$out/libexec/clawd-back"
-        cp notify capture cleanup "$out/libexec/clawd-back/"
+        cp ${lib.concatStringsSep " " hookNames} "$out/libexec/clawd-back/"
         chmod +x "$out/libexec/clawd-back/"*
         runHook postInstall
       '';
-    };
+      passthru = lib.genAttrs hookNames (
+        name: "${finalAttrs.finalPackage}/libexec/clawd-back/${name}"
+      );
+    });
 
   hooks = {
     nushell = mkHooks "nushell" { buildInputs = [ nushell ]; };

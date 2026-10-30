@@ -110,10 +110,10 @@ Nushell (swap `bash` for `nushell`):
 
 Use whatever path the app actually lives at, `~/Applications/...` for a local copy.
 
-> **Nix users:** the package has the hooks as `passthru` outputs, `pkgs.clawd-back.hooks.nushell` and `pkgs.clawd-back.hooks.bash`, each with `libexec/clawd-back/{capture,notify,cleanup}`. The flake also exposes them as `packages.<system>.hooks-nushell` and `hooks-bash`. Their shebangs point into the store, so they need no interpreter or `jq` on `PATH`. A `/nix/store` path changes on rebuild, so link them to stable paths and point the hook commands there:
+> **Nix users:** the package has the hooks as `passthru` outputs, `pkgs.clawd-back.hooks.nushell` and `pkgs.clawd-back.hooks.bash`, each with `libexec/clawd-back/{capture,notify,cleanup}`. Each hook's path is also an attribute, `pkgs.clawd-back.hooks.nushell.notify`. The flake also exposes them as `packages.<system>.hooks-nushell` and `hooks-bash`. Their shebangs point into the store, so they need no interpreter or `jq` on `PATH`. A `/nix/store` path changes on rebuild, so link them to stable paths and point the hook commands there:
 >
 > ```nix
-> home.file.".claude/hooks/notify".source = "${pkgs.clawd-back.hooks.nushell}/libexec/clawd-back/notify";
+> home.file.".claude/hooks/notify".source = pkgs.clawd-back.hooks.nushell.notify;
 > ```
 
 Prefer your own copies, or a shell that isn't shipped? The same wrappers live under [`hooks/`](hooks/), one directory per shell: [`hooks/bash/`](hooks/bash/) and [`hooks/nushell/`](hooks/nushell/). Copy a set to `~/.claude/hooks/` and point the commands there instead.
