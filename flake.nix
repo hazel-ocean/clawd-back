@@ -18,6 +18,8 @@
       {
         packages.default = app;
         packages.clawd-back = app;
+        packages.hooks-nushell = app.hooks.nushell;
+        packages.hooks-bash = app.hooks.bash;
       }
     );
 }

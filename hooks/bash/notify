@@ -14,27 +14,48 @@ transcript=$(get transcript_path)
 cwd=$(get cwd); cwd=${cwd:-$PWD}
 
 # Title states the reason: the specific Notification message, or the finished
-# state on Stop.
-case "$event" in
-  Notification) title=${message:-"Claude has something to say"} ;;
-  *)            title="Claude has finished and is waiting" ;;
+# state on Stop. Inside zellij the session name leads and the reason shrinks,
+# so a glance tells you which workspace wants you.
+ws=${ZELLIJ_SESSION_NAME:-}
+case "$event:${ws:+zellij}" in
+  Notification:)       title=${message:-"Claude has something to say"} ;;
+  Notification:zellij) title="[$ws] has something to say." ;;
+  *:)                  title="Claude has finished and is waiting" ;;
+  *:zellij)            title="[$ws] is waiting." ;;
 esac
 
-# Lead with the zellij session name when present, so a glance tells you which
-# workspace wants you.
-if [ -n "${ZELLIJ_SESSION_NAME:-}" ]; then
-  title="[$ZELLIJ_SESSION_NAME] $title"
-fi
-
-# Body always carries Claude's last transcript text as color. The scan needs jq;
-# without it the body is a nudge.
+# Body is Claude's last text in this turn, or a nudge when the turn has none.
+# Text from an earlier turn would describe work that is already done. Stop has
+# the turn's final text in the payload, and the transcript can lag behind it.
+# The transcript scan needs jq; without it the body is a nudge.
 said=""
-if [ -n "$transcript" ] && [ -f "$transcript" ] && command -v jq >/dev/null 2>&1; then
-  said=$(tail -n 150 "$transcript" \
-    | jq -rc 'select(.type=="assistant") | [.message.content[]? | select(.type=="text") | .text] | join(" ")' 2>/dev/null \
-    | grep -v '^$' | tail -n 1 | tr '\n' ' ' | cut -c1-180 | sed 's/[[:space:]]*$//' || true)
+source=transcript
+if [ "$event" = "Stop" ]; then
+  said=$(get last_assistant_message)
+  [ -n "$said" ] && source=payload
 fi
-body=${said:-"Click to go check on Clawd"}
+if [ -z "$said" ] && [ -n "$transcript" ] && [ -f "$transcript" ] && command -v jq >/dev/null 2>&1; then
+  # A prompt is a user entry with no tool_result in it. Meta user entries are
+  # harness text, not the user.
+  said=$(tail -n 300 "$transcript" \
+    | jq -cR 'fromjson?' 2>/dev/null \
+    | jq -rsc '
+        (map(.type == "user" and .isMeta != true and (
+            (.message.content | type) == "string"
+            or ([.message.content[]? | select(.type == "tool_result")] | length) == 0))
+          | indices(true) | last) as $p
+        | (if $p == null then . else .[$p + 1:] end)
+        | map(select(.type == "assistant")
+            | [.message.content[]? | select(.type == "text") | .text] | join(" ")
+            | select(test("\\S")))
+        | last // ""' 2>/dev/null || true)
+fi
+said=$(printf '%s' "$said" | tr '\n' ' ' | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' | cut -c1-180)
+if [ -z "$said" ]; then
+  said="Click to go check on Clawd"
+  source=nudge
+fi
+body=$said
 
 # macOS stamps the launching app's bundle id on this process, so it names the
 # host the session runs in. Forwarded because LaunchServices overwrites it with
@@ -42,6 +63,7 @@ body=${said:-"Click to go check on Clawd"}
 open -gn "$app" --args notify \
   --title "$title" \
   --message "$body" \
+  --body-source "$source" \
   --session-id "$sid" \
   --cwd "$cwd" \
   --host-bundle-id "${__CFBundleIdentifier:-}"

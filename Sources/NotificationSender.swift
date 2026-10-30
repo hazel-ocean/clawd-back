@@ -205,6 +205,12 @@ func sendNotification(args: [String]) async {
   do {
     try await center.add(request)
     counter(.notificationPosted)
+    switch parseArg(args, flag: "--body-source") {
+    case "payload": counter(.notificationBodyFromPayload)
+    case "transcript": counter(.notificationBodyFromTranscript)
+    case "nudge": counter(.notificationBodyNudge)
+    default: break
+    }
     if let sessionId, !sessionId.isEmpty {
       var state =
         saved

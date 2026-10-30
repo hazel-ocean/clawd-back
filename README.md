@@ -110,11 +110,15 @@ Nushell (swap `bash` for `nushell`):
 
 Use whatever path the app actually lives at, `~/Applications/...` for a local copy.
 
-> **Nix users:** the flake installs the app under `~/Applications` (a `/nix/store` path rotates on rebuild). Rather than chase the bundle path, generate your own wrappers with `pkgs.writeScript` and point the hooks at their stable `~/.claude/hooks/...` symlinks. The [`hooks/nushell/`](hooks/nushell/) scripts are a ready template.
+> **Nix users:** the package has the hooks as `passthru` outputs, `pkgs.clawd-back.hooks.nushell` and `pkgs.clawd-back.hooks.bash`, each with `libexec/clawd-back/{capture,notify,cleanup}`. Each hook's path is also an attribute, `pkgs.clawd-back.hooks.nushell.notify`. The flake also exposes them as `packages.<system>.hooks-nushell` and `hooks-bash`. Their shebangs point into the store, so they need no interpreter or `jq` on `PATH`. A `/nix/store` path changes on rebuild, so link them to stable paths and point the hook commands there:
+>
+> ```nix
+> home.file.".claude/hooks/notify".source = pkgs.clawd-back.hooks.nushell.notify;
+> ```
 
 Prefer your own copies, or a shell that isn't shipped? The same wrappers live under [`hooks/`](hooks/), one directory per shell: [`hooks/bash/`](hooks/bash/) and [`hooks/nushell/`](hooks/nushell/). Copy a set to `~/.claude/hooks/` and point the commands there instead.
 
-The banner title states the reason: on a `Notification` it's the specific message (which tool needs permission, or idle); on `Stop` it's `Claude has finished and is waiting`. Inside Zellij it's led by the session name, `[my-project] Claude has finished and is waiting`, so a glance tells you which workspace wants you. The body always carries Claude's last message, pulled from the transcript tail, as color. The Nushell `notify` parses the transcript natively; the bash one needs `jq` for it and otherwise falls back to a generic nudge.
+The banner title states the reason: on a `Notification` it's the specific message (which tool needs permission, or idle); on `Stop` it's `Claude has finished and is waiting`. Inside Zellij the session name leads and the reason shrinks, `[my-project] has something to say.` or `[my-project] is waiting.`, so a glance tells you which workspace wants you. The body is Claude's last text in the current turn: `last_assistant_message` on `Stop`, the transcript tail on `Notification`. A turn with no text yet gets a generic nudge. The Nushell `notify` parses the transcript natively; the bash one needs `jq` for it and otherwise falls back to the nudge.
 
 Because `open` propagates the caller's environment, `ZELLIJ_SESSION_NAME` / `ZELLIJ_PANE_ID` reach the app when the hook runs inside a Zellij pane.
 
