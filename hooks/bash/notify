@@ -14,17 +14,15 @@ transcript=$(get transcript_path)
 cwd=$(get cwd); cwd=${cwd:-$PWD}
 
 # Title states the reason: the specific Notification message, or the finished
-# state on Stop.
-case "$event" in
-  Notification) title=${message:-"Claude has something to say"} ;;
-  *)            title="Claude has finished and is waiting" ;;
+# state on Stop. Inside zellij the session name leads and the reason shrinks,
+# so a glance tells you which workspace wants you.
+ws=${ZELLIJ_SESSION_NAME:-}
+case "$event:${ws:+zellij}" in
+  Notification:)       title=${message:-"Claude has something to say"} ;;
+  Notification:zellij) title="[$ws] has something to say." ;;
+  *:)                  title="Claude has finished and is waiting" ;;
+  *:zellij)            title="[$ws] is waiting." ;;
 esac
-
-# Lead with the zellij session name when present, so a glance tells you which
-# workspace wants you.
-if [ -n "${ZELLIJ_SESSION_NAME:-}" ]; then
-  title="[$ZELLIJ_SESSION_NAME] $title"
-fi
 
 # Body is Claude's last text in this turn, or a nudge when the turn has none.
 # Text from an earlier turn would describe work that is already done. Stop has

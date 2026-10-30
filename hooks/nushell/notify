@@ -54,14 +54,15 @@ let last_said = ($said_source.said
 # tool needs permission, or idle) from the hook payload; on Stop it's the
 # finished state. Body is Claude's last text in this turn, or a nudge when the
 # turn has none.
-let reason = (match $event {
-  "Notification" => (if ($message | str trim | is-empty) { "Claude has something to say" } else { $message })
-  "Stop" | _     => "Claude has finished and is waiting"
-})
-# Lead with the zellij session name when present, so a glance tells you which
-# workspace wants you.
+# Inside zellij the session name leads and the reason shrinks, so a glance
+# tells you which workspace wants you.
 let workspace = ($env.ZELLIJ_SESSION_NAME? | default "")
-let title = (if ($workspace | is-empty) { $reason } else { $"[($workspace)] ($reason)" })
+let title = (match [$event $workspace] {
+  ["Notification" ""] => (if ($message | str trim | is-empty) { "Claude has something to say" } else { $message })
+  ["Notification" $ws] => $"[($ws)] has something to say."
+  [_ ""] => "Claude has finished and is waiting"
+  [_ $ws] => $"[($ws)] is waiting."
+})
 let body = (if ($last_said | is-empty) { "Click to go check on Clawd" } else { $last_said })
 let body_source = (if ($last_said | is-empty) { "nudge" } else { $said_source.source })
 
