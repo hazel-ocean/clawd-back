@@ -42,7 +42,26 @@ Apple Silicon, macOS 13+. The build is ad-hoc signed (not notarized), so the cas
 inputs.clawd-back.url = "github:hazel-ocean/clawd-back";
 ```
 
-The flake exposes `packages.default` (an `.app` under `$out/Applications`). Install it where LaunchServices can find it, for example a home-manager activation that copies it to `~/Applications`, re-signs ad-hoc, and runs `lsregister`.
+The flake exposes:
+
+- `packages.default`: the `.app` under `$out/Applications`.
+- `packages.hooks-nushell` and `packages.hooks-bash`: the [Claude Code hooks](#claude-code-hooks). The app package also has them as `hooks.nushell` and `hooks.bash`.
+
+Each hook's path is an attribute, for example `hooks.nushell.notify`. The shebangs point into the store, so the hooks need no interpreter or `jq` on `PATH`.
+
+The flake also has a home-manager module, `homeManagerModules.default`. It copies the app to `~/Applications`, signs it ad-hoc and registers it with LaunchServices, because a click relaunches the app by bundle id. With `hooks` set, it links that hook set to stable paths:
+
+```nix
+{
+  imports = [ inputs.clawd-back.homeManagerModules.default ];
+  programs.clawd-back = {
+    enable = true;
+    hooks = "nushell"; # or "bash"; null links none
+  };
+}
+```
+
+Then point the Claude Code hook commands at `~/.claude/hooks/{capture,notify,cleanup}`. The module does not write Claude Code's `settings.json`.
 
 ### Just
 
@@ -110,11 +129,7 @@ Nushell (swap `bash` for `nushell`):
 
 Use whatever path the app actually lives at, `~/Applications/...` for a local copy.
 
-> **Nix users:** the package has the hooks as `passthru` outputs, `pkgs.clawd-back.hooks.nushell` and `pkgs.clawd-back.hooks.bash`, each with `libexec/clawd-back/{capture,notify,cleanup}`. Each hook's path is also an attribute, `pkgs.clawd-back.hooks.nushell.notify`. The flake also exposes them as `packages.<system>.hooks-nushell` and `hooks-bash`. Their shebangs point into the store, so they need no interpreter or `jq` on `PATH`. A `/nix/store` path changes on rebuild, so link them to stable paths and point the hook commands there:
->
-> ```nix
-> home.file.".claude/hooks/notify".source = pkgs.clawd-back.hooks.nushell.notify;
-> ```
+> **Nix users:** the flake ships the hooks as package outputs, and its home-manager module can link them. See [Nix (flake)](#nix-flake).
 
 Prefer your own copies, or a shell that isn't shipped? The same wrappers live under [`hooks/`](hooks/), one directory per shell: [`hooks/bash/`](hooks/bash/) and [`hooks/nushell/`](hooks/nushell/). Copy a set to `~/.claude/hooks/` and point the commands there instead.
 
